@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import * as XLSX from 'xlsx'
 
 type Cenovnik = {
   iznos_1_dete: number
@@ -274,30 +275,19 @@ export default function ClanarineScreen() {
 
   function izvezi() {
     const godina = izabraniMesec >= 9 ? pocetnaGodina : pocetnaGodina + 1
-    const zaglavlje = ['Porodica', 'Broj dece', 'Mesecni iznos', 'Uplaceno', 'Dug', 'Status']
-    const linije = [zaglavlje, ...prikazani.map((r) => [
-      nazivPorodice(r.p),
-      r.n,
-      r.ukupno,
-      r.uplaceno,
-      r.preostalo,
-      r.statusTekst,
-    ])].map((row) =>
-      row
-        .map((c) => {
-          const s = String(c)
-          return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
-        })
-        .join(';')
-    )
-    const csv = linije.join('\r\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `Clanarine_${MESECI[izabraniMesec]}_${godina}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const podaci = prikazani.map((r) => ({
+      Porodica: nazivPorodice(r.p),
+      'Broj dece': r.n,
+      'Mesečni iznos': r.ukupno,
+      'Uplaćeno': r.uplaceno,
+      Dug: r.preostalo,
+      Status: r.statusTekst,
+    }))
+    const ws = XLSX.utils.json_to_sheet(podaci)
+    ws['!cols'] = [{ wch: 28 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, `${MESECI[izabraniMesec]} ${godina}`)
+    XLSX.writeFile(wb, `Clanarine_${MESECI[izabraniMesec]}_${godina}.xlsx`)
   }
 
   function statusBadge(placeno: number, ukupno: number) {
