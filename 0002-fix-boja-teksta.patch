@@ -1,0 +1,12 @@
+diff --git a/src/features/porodice/PorodiceScreen.tsx b/src/features/porodice/PorodiceScreen.tsx
+index 89e619e..c4f4b87 100644
+--- a/src/features/porodice/PorodiceScreen.tsx
++++ b/src/features/porodice/PorodiceScreen.tsx
+@@ -48,6 +48,7 @@ const stilInput: React.CSSProperties = {
+   fontSize: 15,
+   boxSizing: 'border-box',
+   background: '#fff',
++  color: boja.tekst,
+ }
+ 
+ const stilLabela: React.CSSProperties = {

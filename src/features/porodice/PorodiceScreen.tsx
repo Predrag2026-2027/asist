@@ -48,6 +48,7 @@ const stilInput: React.CSSProperties = {
   fontSize: 15,
   boxSizing: 'border-box',
   background: '#fff',
+  color: boja.tekst,
 }
 
 const stilLabela: React.CSSProperties = {
