@@ -1,0 +1,479 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index 3911106..8ab917b 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,7 +1,51 @@
++import { useState } from 'react'
+ import PorodiceScreen from './features/porodice/PorodiceScreen'
++import ClanarineScreen from './features/clanarine/ClanarineScreen'
++
++type Tab = 'porodice' | 'clanarine'
+ 
+ function App() {
+-  return <PorodiceScreen />
++  const [tab, setTab] = useState<Tab>('porodice')
++
++  const dugme = (t: Tab, labela: string) => (
++    <button
++      onClick={() => setTab(t)}
++      style={{
++        flex: 1,
++        padding: '12px 8px',
++        border: 'none',
++        background: 'none',
++        fontSize: 15,
++        fontWeight: tab === t ? 600 : 400,
++        color: tab === t ? '#c2410c' : '#6b6a64',
++        borderBottom: tab === t ? '2px solid #c2410c' : '2px solid transparent',
++        cursor: 'pointer',
++      }}
++    >
++      {labela}
++    </button>
++  )
++
++  return (
++    <div style={{ fontFamily: 'system-ui, sans-serif' }}>
++      <nav
++        style={{
++          display: 'flex',
++          position: 'sticky',
++          top: 0,
++          zIndex: 10,
++          background: '#ffffff',
++          borderBottom: '1px solid #e2e0d8',
++          maxWidth: 640,
++          margin: '0 auto',
++        }}
++      >
++        {dugme('porodice', 'Porodice')}
++        {dugme('clanarine', 'Članarine')}
++      </nav>
++      {tab === 'porodice' ? <PorodiceScreen /> : <ClanarineScreen />}
++    </div>
++  )
+ }
+ 
+ export default App
+diff --git a/src/features/clanarine/ClanarineScreen.tsx b/src/features/clanarine/ClanarineScreen.tsx
+new file mode 100644
+index 0000000..5536796
+--- /dev/null
++++ b/src/features/clanarine/ClanarineScreen.tsx
+@@ -0,0 +1,416 @@
++import { useEffect, useState } from 'react'
++import { supabase } from '../../lib/supabase'
++
++type Cenovnik = {
++  iznos_1_dete: number
++  iznos_2_dete: number
++  iznos_3plus: number
++}
++
++type Porodica = {
++  id: string
++  prezime: string
++  clanovi: { id: string; ime: string; datum_rodjenja: string | null }[]
++}
++
++type ZaduzenjeInfo = {
++  id: string
++  iznos_ukupno: number
++  uplaceno: number
++}
++
++const boja = {
++  tekst: '#1c1c1a',
++  meki: '#6b6a64',
++  ivica: '#e2e0d8',
++  pozadina: '#faf9f5',
++  karta: '#ffffff',
++  akcenat: '#c2410c',
++  greska: '#b91c1c',
++  uspeh: '#15803d',
++}
++
++const MESECI: Record<number, string> = {
++  1: 'Januar', 2: 'Februar', 3: 'Mart', 4: 'April', 5: 'Maj', 6: 'Jun',
++  7: 'Jul', 8: 'Avgust', 9: 'Septembar', 10: 'Oktobar', 11: 'Novembar', 12: 'Decembar',
++}
++
++function nazivPorodice(p: Porodica): string {
++  const imena = [...p.clanovi]
++    .sort((a, b) => (a.datum_rodjenja ?? '').localeCompare(b.datum_rodjenja ?? ''))
++    .map((d) => d.ime)
++  return imena.length ? `${p.prezime} (${imena.join(', ')})` : p.prezime
++}
++
++function formatRSD(n: number): string {
++  return new Intl.NumberFormat('sr-RS', { minimumFractionDigits: 0 }).format(n) + ' RSD'
++}
++
++const stilInput: React.CSSProperties = {
++  padding: '8px 10px',
++  border: `1px solid ${boja.ivica}`,
++  borderRadius: 8,
++  fontSize: 14,
++  boxSizing: 'border-box',
++  background: '#fff',
++  color: boja.tekst,
++}
++
++export default function ClanarineScreen() {
++  const [sezonaId, setSezonaId] = useState<string | null>(null)
++  const [pocetnaGodina, setPocetnaGodina] = useState<number>(new Date().getFullYear())
++  const [meseci, setMeseci] = useState<number[]>([9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7])
++  const [izabraniMesec, setIzabraniMesec] = useState<number>(9)
++  const [cenovnik, setCenovnik] = useState<Cenovnik | null>(null)
++  const [porodice, setPorodice] = useState<Porodica[]>([])
++  const [brojDece, setBrojDece] = useState<Record<string, number>>({})
++  const [zaduzenja, setZaduzenja] = useState<Record<string, ZaduzenjeInfo>>({})
++  const [poruka, setPoruka] = useState<{ tip: 'greska' | 'uspeh'; tekst: string } | null>(null)
++  const [radi, setRadi] = useState(false)
++  const [unosId, setUnosId] = useState<string | null>(null)
++  const [iznosUplate, setIznosUplate] = useState('')
++
++  function periodString(mesec: number): string {
++    const godina = mesec >= 9 ? pocetnaGodina : pocetnaGodina + 1
++    return `${godina}-${String(mesec).padStart(2, '0')}-01`
++  }
++
++  function iznosZaBroj(n: number): number {
++    if (!cenovnik || n <= 0) return 0
++    let s = 0
++    if (n >= 1) s += Number(cenovnik.iznos_1_dete)
++    if (n >= 2) s += Number(cenovnik.iznos_2_dete)
++    if (n >= 3) s += Number(cenovnik.iznos_3plus) * (n - 2)
++    return s
++  }
++
++  async function ucitajOsnovu() {
++    const { data: sez } = await supabase
++      .from('sezone')
++      .select('id, datum_od')
++      .eq('aktivna', true)
++      .maybeSingle()
++    const sid = (sez as any)?.id ?? null
++    setSezonaId(sid)
++    if (!sid) return
++
++    const pg = (sez as any).datum_od ? new Date((sez as any).datum_od).getFullYear() : new Date().getFullYear()
++    setPocetnaGodina(pg)
++
++    const { data: cen } = await supabase
++      .from('cenovnik')
++      .select('iznos_1_dete, iznos_2_dete, iznos_3plus')
++      .eq('sezona_id', sid)
++      .order('vazi_od', { ascending: false })
++      .limit(1)
++      .maybeSingle()
++    setCenovnik((cen as any) ?? null)
++
++    const { data: np } = await supabase
++      .from('naplatni_period')
++      .select('meseci')
++      .eq('sezona_id', sid)
++      .is('grupa_id', null)
++      .maybeSingle()
++    if ((np as any)?.meseci?.length) setMeseci((np as any).meseci)
++
++    const { data: por } = await supabase
++      .from('porodice')
++      .select('id, prezime, clanovi(id, ime, datum_rodjenja)')
++      .order('prezime')
++    setPorodice((por as any) ?? [])
++
++    const { data: clanstvo } = await supabase
++      .from('clanstvo')
++      .select('clan_id')
++      .eq('sezona_id', sid)
++      .eq('maticno', true)
++      .is('datum_do', null)
++    const upisani = new Set(((clanstvo as any[]) ?? []).map((c) => c.clan_id))
++
++    const { data: clanovi } = await supabase.from('clanovi').select('id, porodica_id, status')
++    const brojMap: Record<string, number> = {}
++    for (const c of (clanovi as any[]) ?? []) {
++      if (c.status === 'aktivan' && upisani.has(c.id)) {
++        brojMap[c.porodica_id] = (brojMap[c.porodica_id] ?? 0) + 1
++      }
++    }
++    setBrojDece(brojMap)
++  }
++
++  async function ucitajZaduzenja(mesec: number, sid: string) {
++    const { data } = await supabase
++      .from('zaduzenja')
++      .select('id, porodica_id, iznos_ukupno, uplate(iznos)')
++      .eq('sezona_id', sid)
++      .eq('period', periodString(mesec))
++    const map: Record<string, ZaduzenjeInfo> = {}
++    for (const z of (data as any[]) ?? []) {
++      const uplaceno = (z.uplate ?? []).reduce((s: number, u: any) => s + Number(u.iznos), 0)
++      map[z.porodica_id] = { id: z.id, iznos_ukupno: Number(z.iznos_ukupno), uplaceno }
++    }
++    setZaduzenja(map)
++  }
++
++  useEffect(() => {
++    ucitajOsnovu()
++  }, [])
++
++  useEffect(() => {
++    if (sezonaId) ucitajZaduzenja(izabraniMesec, sezonaId)
++  }, [sezonaId, izabraniMesec, pocetnaGodina])
++
++  async function evidentirajUplatu(p: Porodica) {
++    setPoruka(null)
++    if (!sezonaId) return
++    const suma = Number(iznosUplate.replace(',', '.'))
++    if (!suma || suma <= 0) {
++      setPoruka({ tip: 'greska', tekst: 'Unesi ispravan iznos uplate.' })
++      return
++    }
++    const n = brojDece[p.id] ?? 0
++    const mesecni = iznosZaBroj(n)
++    setRadi(true)
++    try {
++      let z = zaduzenja[p.id]
++      let zid = z?.id
++      const ukupno = z?.iznos_ukupno ?? mesecni
++      if (!zid) {
++        const { data: novo, error } = await supabase
++          .from('zaduzenja')
++          .insert({
++            porodica_id: p.id,
++            sezona_id: sezonaId,
++            period: periodString(izabraniMesec),
++            iznos_ukupno: mesecni,
++            broj_dece_obracun: n,
++          })
++          .select('id')
++          .single()
++        if (error) throw error
++        zid = (novo as any).id
++      }
++
++      const { error: eU } = await supabase.from('uplate').insert({ zaduzenje_id: zid, iznos: suma })
++      if (eU) throw eU
++
++      const uplacenoNovo = (z?.uplaceno ?? 0) + suma
++      const status = uplacenoNovo >= ukupno ? 'placeno' : uplacenoNovo > 0 ? 'delimicno' : 'neplaceno'
++      await supabase.from('zaduzenja').update({ status }).eq('id', zid)
++
++      setUnosId(null)
++      setIznosUplate('')
++      setPoruka({ tip: 'uspeh', tekst: `Uplata za ${nazivPorodice(p)} je evidentirana.` })
++      await ucitajZaduzenja(izabraniMesec, sezonaId)
++    } catch (err: any) {
++      setPoruka({ tip: 'greska', tekst: 'Greška: ' + (err.message ?? String(err)) })
++    } finally {
++      setRadi(false)
++    }
++  }
++
++  const naplative = porodice.filter((p) => (brojDece[p.id] ?? 0) > 0)
++
++  let ukOcekivano = 0
++  let ukNaplaceno = 0
++  for (const p of naplative) {
++    const n = brojDece[p.id] ?? 0
++    const z = zaduzenja[p.id]
++    ukOcekivano += z?.iznos_ukupno ?? iznosZaBroj(n)
++    ukNaplaceno += z?.uplaceno ?? 0
++  }
++  const ukDug = ukOcekivano - ukNaplaceno
++
++  function statusBadge(placeno: number, ukupno: number) {
++    let tekst = 'Neplaćeno'
++    let c = boja.greska
++    if (placeno >= ukupno && ukupno > 0) {
++      tekst = 'Plaćeno'
++      c = boja.uspeh
++    } else if (placeno > 0) {
++      tekst = 'Delimično'
++      c = boja.akcenat
++    }
++    return (
++      <span style={{ fontSize: 12, fontWeight: 600, color: c }}>{tekst}</span>
++    )
++  }
++
++  return (
++    <div
++      style={{
++        fontFamily: 'system-ui, sans-serif',
++        background: boja.pozadina,
++        color: boja.tekst,
++        minHeight: '100vh',
++        padding: 16,
++      }}
++    >
++      <div style={{ maxWidth: 640, margin: '0 auto' }}>
++        <h1 style={{ fontSize: 22, fontWeight: 600, margin: '8px 0 2px' }}>Evidencija članarina</h1>
++        <p style={{ color: boja.meki, marginTop: 0, fontSize: 14 }}>Sezona 2026/2027</p>
++
++        <div style={{ margin: '12px 0' }}>
++          <label style={{ display: 'block', fontSize: 13, color: boja.meki, marginBottom: 4 }}>Mesec</label>
++          <select
++            style={{ ...stilInput, minWidth: 180 }}
++            value={izabraniMesec}
++            onChange={(e) => setIzabraniMesec(Number(e.target.value))}
++          >
++            {meseci.map((m) => (
++              <option key={m} value={m}>
++                {MESECI[m]} {m >= 9 ? pocetnaGodina : pocetnaGodina + 1}
++              </option>
++            ))}
++          </select>
++        </div>
++
++        <div
++          style={{
++            display: 'flex',
++            gap: 8,
++            marginBottom: 12,
++            flexWrap: 'wrap',
++          }}
++        >
++          {[
++            { l: 'Očekivano', v: ukOcekivano, c: boja.tekst },
++            { l: 'Naplaćeno', v: ukNaplaceno, c: boja.uspeh },
++            { l: 'Dug', v: ukDug, c: boja.greska },
++          ].map((k) => (
++            <div
++              key={k.l}
++              style={{
++                flex: 1,
++                minWidth: 120,
++                background: boja.karta,
++                border: `1px solid ${boja.ivica}`,
++                borderRadius: 10,
++                padding: '10px 12px',
++              }}
++            >
++              <div style={{ fontSize: 12, color: boja.meki }}>{k.l}</div>
++              <div style={{ fontSize: 16, fontWeight: 600, color: k.c }}>{formatRSD(k.v)}</div>
++            </div>
++          ))}
++        </div>
++
++        {poruka && (
++          <p style={{ fontSize: 14, color: poruka.tip === 'greska' ? boja.greska : boja.uspeh }}>
++            {poruka.tekst}
++          </p>
++        )}
++
++        {naplative.length === 0 ? (
++          <p style={{ color: boja.meki, fontSize: 14 }}>
++            Nema porodica sa upisanom decom. Prvo upiši decu u grupe na ekranu „Porodice".
++          </p>
++        ) : (
++          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
++            {naplative.map((p) => {
++              const n = brojDece[p.id] ?? 0
++              const z = zaduzenja[p.id]
++              const ukupno = z?.iznos_ukupno ?? iznosZaBroj(n)
++              const uplaceno = z?.uplaceno ?? 0
++              const preostalo = Math.max(ukupno - uplaceno, 0)
++              return (
++                <div
++                  key={p.id}
++                  style={{
++                    background: boja.karta,
++                    border: `1px solid ${boja.ivica}`,
++                    borderRadius: 10,
++                    padding: 12,
++                  }}
++                >
++                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
++                    <div>
++                      <div style={{ fontWeight: 600 }}>{nazivPorodice(p)}</div>
++                      <div style={{ color: boja.meki, fontSize: 13, marginTop: 2 }}>
++                        {n} {n === 1 ? 'dete' : 'dece'} · {formatRSD(ukupno)}
++                        {uplaceno > 0 ? ` · uplaćeno ${formatRSD(uplaceno)}` : ''}
++                      </div>
++                    </div>
++                    <div style={{ textAlign: 'right' }}>
++                      {statusBadge(uplaceno, ukupno)}
++                      <div style={{ fontSize: 12, color: boja.meki, marginTop: 2 }}>
++                        {preostalo > 0 ? `duguje ${formatRSD(preostalo)}` : ''}
++                      </div>
++                    </div>
++                  </div>
++
++                  {unosId === p.id ? (
++                    <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
++                      <input
++                        style={{ ...stilInput, width: 120 }}
++                        value={iznosUplate}
++                        onChange={(e) => setIznosUplate(e.target.value)}
++                        placeholder="iznos"
++                        inputMode="numeric"
++                      />
++                      <button
++                        onClick={() => evidentirajUplatu(p)}
++                        disabled={radi}
++                        style={{
++                          background: boja.akcenat,
++                          color: '#fff',
++                          border: 'none',
++                          borderRadius: 8,
++                          padding: '8px 14px',
++                          fontSize: 14,
++                          fontWeight: 600,
++                          cursor: 'pointer',
++                        }}
++                      >
++                        Sačuvaj
++                      </button>
++                      <button
++                        onClick={() => {
++                          setUnosId(null)
++                          setIznosUplate('')
++                        }}
++                        style={{
++                          background: 'none',
++                          border: `1px solid ${boja.ivica}`,
++                          borderRadius: 8,
++                          padding: '8px 12px',
++                          fontSize: 14,
++                          cursor: 'pointer',
++                          color: boja.tekst,
++                        }}
++                      >
++                        Otkaži
++                      </button>
++                    </div>
++                  ) : (
++                    preostalo > 0 && (
++                      <button
++                        onClick={() => {
++                          setUnosId(p.id)
++                          setIznosUplate(String(preostalo))
++                          setPoruka(null)
++                        }}
++                        style={{
++                          marginTop: 10,
++                          background: 'none',
++                          border: `1px solid ${boja.ivica}`,
++                          borderRadius: 8,
++                          padding: '6px 12px',
++                          fontSize: 13,
++                          cursor: 'pointer',
++                          color: boja.tekst,
++                        }}
++                      >
++                        + Evidentiraj uplatu
++                      </button>
++                    )
++                  )}
++                </div>
++              )
++            })}
++          </div>
++        )}
++      </div>
++    </div>
++  )
++}
