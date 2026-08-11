@@ -3,9 +3,10 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import PorodiceScreen from './features/porodice/PorodiceScreen'
 import ClanarineScreen from './features/clanarine/ClanarineScreen'
+import UvozScreen from './features/uvoz/UvozScreen'
 import LoginScreen from './features/auth/LoginScreen'
 
-type Tab = 'porodice' | 'clanarine'
+type Tab = 'porodice' | 'clanarine' | 'uvoz'
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -69,6 +70,7 @@ function App() {
           <div style={{ display: 'flex', flex: 1 }}>
             {dugme('porodice', 'Porodice')}
             {dugme('clanarine', 'Članarine')}
+            {dugme('uvoz', 'Uvoz')}
           </div>
           <button
             onClick={() => supabase.auth.signOut()}
@@ -85,7 +87,9 @@ function App() {
           </button>
         </div>
       </div>
-      {tab === 'porodice' ? <PorodiceScreen /> : <ClanarineScreen />}
+      {tab === 'porodice' && <PorodiceScreen />}
+      {tab === 'clanarine' && <ClanarineScreen />}
+      {tab === 'uvoz' && <UvozScreen />}
     </div>
   )
 }
