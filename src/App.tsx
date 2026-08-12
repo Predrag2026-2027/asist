@@ -5,10 +5,11 @@ import PorodiceScreen from './features/porodice/PorodiceScreen'
 import ClanarineScreen from './features/clanarine/ClanarineScreen'
 import TreninziScreen from './features/treninzi/TreninziScreen'
 import StatistikaScreen from './features/statistika/StatistikaScreen'
+import FinansijeScreen from './features/finansije/FinansijeScreen'
 import UvozScreen from './features/uvoz/UvozScreen'
 import LoginScreen from './features/auth/LoginScreen'
 
-type Tab = 'porodice' | 'clanarine' | 'treninzi' | 'statistika' | 'uvoz'
+type Tab = 'porodice' | 'clanarine' | 'treninzi' | 'statistika' | 'finansije' | 'uvoz'
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -40,11 +41,12 @@ function App() {
     <button
       onClick={() => setTab(t)}
       style={{
-        flex: 1,
-        padding: '12px 4px',
+        flex: '0 0 auto',
+        padding: '12px 14px',
         border: 'none',
         background: 'none',
-        fontSize: 13,
+        fontSize: 14,
+        whiteSpace: 'nowrap',
         fontWeight: tab === t ? 600 : 400,
         color: tab === t ? '#c2410c' : '#6b6a64',
         borderBottom: tab === t ? '2px solid #c2410c' : '2px solid transparent',
@@ -66,35 +68,30 @@ function App() {
           position: 'sticky',
           top: 0,
           zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ display: 'flex', flex: 1 }}>
-            {dugme('porodice', 'Porodice')}
-            {dugme('clanarine', 'Članarine')}
-            {dugme('treninzi', 'Treninzi')}
-            {dugme('statistika', 'Statistika')}
-            {dugme('uvoz', 'Uvoz')}
-          </div>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            style={{
-              border: 'none',
-              background: 'none',
-              color: '#6b6a64',
-              fontSize: 12,
-              cursor: 'pointer',
-              padding: '0 10px',
-            }}
-          >
-            Odjava
-          </button>
+        <div style={{ display: 'flex', overflowX: 'auto', flex: 1 }}>
+          {dugme('porodice', 'Porodice')}
+          {dugme('clanarine', 'Članarine')}
+          {dugme('treninzi', 'Treninzi')}
+          {dugme('statistika', 'Statistika')}
+          {dugme('finansije', 'Finansije')}
+          {dugme('uvoz', 'Uvoz')}
         </div>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          style={{ flex: '0 0 auto', border: 'none', background: 'none', color: '#6b6a64', fontSize: 12, cursor: 'pointer', padding: '0 10px' }}
+        >
+          Odjava
+        </button>
       </div>
       {tab === 'porodice' && <PorodiceScreen />}
       {tab === 'clanarine' && <ClanarineScreen />}
       {tab === 'treninzi' && <TreninziScreen />}
       {tab === 'statistika' && <StatistikaScreen />}
+      {tab === 'finansije' && <FinansijeScreen />}
       {tab === 'uvoz' && <UvozScreen />}
     </div>
   )
