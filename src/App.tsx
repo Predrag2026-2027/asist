@@ -3,10 +3,11 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import PorodiceScreen from './features/porodice/PorodiceScreen'
 import ClanarineScreen from './features/clanarine/ClanarineScreen'
+import TreninziScreen from './features/treninzi/TreninziScreen'
 import UvozScreen from './features/uvoz/UvozScreen'
 import LoginScreen from './features/auth/LoginScreen'
 
-type Tab = 'porodice' | 'clanarine' | 'uvoz'
+type Tab = 'porodice' | 'clanarine' | 'treninzi' | 'uvoz'
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -39,10 +40,10 @@ function App() {
       onClick={() => setTab(t)}
       style={{
         flex: 1,
-        padding: '12px 8px',
+        padding: '12px 6px',
         border: 'none',
         background: 'none',
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: tab === t ? 600 : 400,
         color: tab === t ? '#c2410c' : '#6b6a64',
         borderBottom: tab === t ? '2px solid #c2410c' : '2px solid transparent',
@@ -70,6 +71,7 @@ function App() {
           <div style={{ display: 'flex', flex: 1 }}>
             {dugme('porodice', 'Porodice')}
             {dugme('clanarine', 'Članarine')}
+            {dugme('treninzi', 'Treninzi')}
             {dugme('uvoz', 'Uvoz')}
           </div>
           <button
@@ -89,6 +91,7 @@ function App() {
       </div>
       {tab === 'porodice' && <PorodiceScreen />}
       {tab === 'clanarine' && <ClanarineScreen />}
+      {tab === 'treninzi' && <TreninziScreen />}
       {tab === 'uvoz' && <UvozScreen />}
     </div>
   )
