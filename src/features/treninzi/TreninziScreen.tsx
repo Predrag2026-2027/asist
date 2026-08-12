@@ -15,6 +15,14 @@ type Trening = {
   napomena: string | null
   status: string
 }
+type Slot = {
+  id: string
+  grupa_id: string
+  dan_u_nedelji: number
+  vreme: string | null
+  mesto: string | null
+  trener_id: string | null
+}
 
 const boja = {
   tekst: '#1c1c1a',
@@ -29,6 +37,7 @@ const boja = {
 
 const PALETA = ['#1D9E75', '#D85A30', '#378ADD', '#7F77DD', '#BA7517', '#D4537E', '#639922', '#0F6E56', '#993C1D', '#185FA5']
 const DANI = ['Pon', 'Uto', 'Sre', 'Čet', 'Pet', 'Sub', 'Ned']
+const DANI_PUN = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja']
 const MESECI = ['Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar']
 const STATUS: Record<string, { l: string; c: string; bg: string }> = {
   planiran: { l: 'Planiran', c: boja.meki, bg: '#f1efe8' },
@@ -39,7 +48,6 @@ const STATUS: Record<string, { l: string; c: string; bg: string }> = {
 function fmt(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
-
 function labelaGrupe(g?: Grupa): string {
   if (!g) return '—'
   return g.uzrast_oznaka ? `${g.naziv} ${g.uzrast_oznaka}` : g.naziv
@@ -55,13 +63,13 @@ const stilInput: React.CSSProperties = {
   background: '#fff',
   color: boja.tekst,
 }
-
 const stilLabela: React.CSSProperties = { display: 'block', fontSize: 12, color: boja.meki, marginBottom: 3 }
 
 export default function TreninziScreen() {
   const [sezonaId, setSezonaId] = useState<string | null>(null)
   const [grupe, setGrupe] = useState<Grupa[]>([])
   const [treneri, setTreneri] = useState<Trener[]>([])
+  const [raspored, setRaspored] = useState<Slot[]>([])
   const [mesecDatum, setMesecDatum] = useState(() => {
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -70,6 +78,7 @@ export default function TreninziScreen() {
   const [izabraniDan, setIzabraniDan] = useState<string | null>(null)
   const [prikaziFormu, setPrikaziFormu] = useState(false)
   const [otvoreniId, setOtvoreniId] = useState<string | null>(null)
+  const [prikaziRaspored, setPrikaziRaspored] = useState(false)
   const [poruka, setPoruka] = useState<{ tip: 'greska' | 'uspeh'; tekst: string } | null>(null)
   const [radi, setRadi] = useState(false)
 
@@ -77,6 +86,12 @@ export default function TreninziScreen() {
   const [novoVreme, setNovoVreme] = useState('18:00')
   const [novoMesto, setNovoMesto] = useState('')
   const [noviTrener, setNoviTrener] = useState('')
+
+  const [rGrupa, setRGrupa] = useState('')
+  const [rDan, setRDan] = useState(1)
+  const [rVreme, setRVreme] = useState('18:00')
+  const [rMesto, setRMesto] = useState('')
+  const [rTrener, setRTrener] = useState('')
 
   const [edit, setEdit] = useState({ vreme: '', mesto: '', trener_id: '', plan: '', napomena: '', status: 'planiran' })
   const [deca, setDeca] = useState<Dete[]>([])
@@ -98,6 +113,17 @@ export default function TreninziScreen() {
     setGrupe((g as any) ?? [])
     const { data: t } = await supabase.from('treneri').select('id, ime').order('ime')
     setTreneri((t as any) ?? [])
+    await ucitajRaspored(sid)
+  }
+
+  async function ucitajRaspored(sid: string) {
+    const { data } = await supabase
+      .from('raspored')
+      .select('id, grupa_id, dan_u_nedelji, vreme, mesto, trener_id')
+      .eq('sezona_id', sid)
+      .order('dan_u_nedelji')
+      .order('vreme')
+    setRaspored((data as any) ?? [])
   }
 
   async function ucitajMesec(sid: string, m: Date) {
@@ -116,7 +142,6 @@ export default function TreninziScreen() {
   useEffect(() => {
     ucitajOsnovu()
   }, [])
-
   useEffect(() => {
     if (sezonaId) ucitajMesec(sezonaId, mesecDatum)
     setOtvoreniId(null)
@@ -143,6 +168,17 @@ export default function TreninziScreen() {
   }
   const terminiDana = izabraniDan ? poDanu.get(izabraniDan) ?? [] : []
 
+  const preklapanja = new Set<string>()
+  const kombinacije = new Map<string, string[]>()
+  for (const t of terminiDana) {
+    if (!t.vreme || !t.mesto) continue
+    const kljuc = `${t.vreme}|${t.mesto.trim().toLowerCase()}`
+    const arr = kombinacije.get(kljuc) ?? []
+    arr.push(t.id)
+    kombinacije.set(kljuc, arr)
+  }
+  for (const arr of kombinacije.values()) if (arr.length > 1) arr.forEach((id) => preklapanja.add(id))
+
   async function dodajTrenera() {
     const ime = window.prompt('Ime trenera:')
     if (!ime || !ime.trim()) return
@@ -153,6 +189,73 @@ export default function TreninziScreen() {
     }
     setTreneri([...treneri, data as any].sort((a, b) => a.ime.localeCompare(b.ime)))
     return (data as any).id as string
+  }
+
+  async function dodajSlot() {
+    if (!rGrupa || !sezonaId) {
+      setPoruka({ tip: 'greska', tekst: 'Izaberi grupu za raspored.' })
+      return
+    }
+    const { error } = await supabase.from('raspored').insert({
+      grupa_id: rGrupa,
+      sezona_id: sezonaId,
+      dan_u_nedelji: rDan,
+      vreme: rVreme || null,
+      mesto: rMesto.trim() || null,
+      trener_id: rTrener || null,
+    })
+    if (error) {
+      setPoruka({ tip: 'greska', tekst: 'Greška: ' + error.message })
+      return
+    }
+    setRMesto('')
+    await ucitajRaspored(sezonaId)
+  }
+
+  async function obrisiSlot(id: string) {
+    const { error } = await supabase.from('raspored').delete().eq('id', id)
+    if (!error && sezonaId) await ucitajRaspored(sezonaId)
+  }
+
+  async function generisi() {
+    if (!sezonaId || raspored.length === 0) {
+      setPoruka({ tip: 'greska', tekst: 'Prvo definiši raspored (bar jedan termin).' })
+      return
+    }
+    setRadi(true)
+    setPoruka(null)
+    try {
+      const inserts: any[] = []
+      for (let d = 1; d <= dana; d++) {
+        const date = new Date(mesecDatum.getFullYear(), mesecDatum.getMonth(), d)
+        const dow = ((date.getDay() + 6) % 7) + 1
+        for (const s of raspored) {
+          if (s.dan_u_nedelji === dow) {
+            inserts.push({
+              grupa_id: s.grupa_id,
+              sezona_id: sezonaId,
+              datum: fmt(date),
+              vreme: s.vreme,
+              mesto: s.mesto,
+              trener_id: s.trener_id,
+              status: 'planiran',
+            })
+          }
+        }
+      }
+      const { data, error } = await supabase
+        .from('treninzi')
+        .upsert(inserts, { onConflict: 'grupa_id,datum', ignoreDuplicates: true })
+        .select('id')
+      if (error) throw error
+      const noviBroj = (data as any[])?.length ?? 0
+      setPoruka({ tip: 'uspeh', tekst: `Generisano ${noviBroj} novih termina za ${MESECI[mesecDatum.getMonth()]} (postojeći preskočeni).` })
+      await ucitajMesec(sezonaId, mesecDatum)
+    } catch (err: any) {
+      setPoruka({ tip: 'greska', tekst: 'Greška: ' + (err.message ?? String(err)) })
+    } finally {
+      setRadi(false)
+    }
   }
 
   async function sacuvajNovi() {
@@ -196,14 +299,7 @@ export default function TreninziScreen() {
     }
     setOtvoreniId(t.id)
     setPoruka(null)
-    setEdit({
-      vreme: t.vreme ?? '',
-      mesto: t.mesto ?? '',
-      trener_id: t.trener_id ?? '',
-      plan: t.plan ?? '',
-      napomena: t.napomena ?? '',
-      status: t.status,
-    })
+    setEdit({ vreme: t.vreme ?? '', mesto: t.mesto ?? '', trener_id: t.trener_id ?? '', plan: t.plan ?? '', napomena: t.napomena ?? '', status: t.status })
     const { data: cl } = await supabase.from('clanstvo').select('clan_id').eq('grupa_id', t.grupa_id).eq('sezona_id', sezonaId).is('datum_do', null)
     const ids = [...new Set(((cl as any[]) ?? []).map((x) => x.clan_id))]
     let decaList: Dete[] = []
@@ -274,17 +370,103 @@ export default function TreninziScreen() {
     fontSize: 13,
     color: boja.tekst,
   }
+  const trenerSelect = (vrednost: string, promeni: (v: string) => void) => (
+    <select
+      style={stilInput}
+      value={vrednost}
+      onChange={async (e) => {
+        if (e.target.value === '__novi__') {
+          const id = await dodajTrenera()
+          if (id) promeni(id)
+        } else promeni(e.target.value)
+      }}
+    >
+      <option value="">— bez trenera —</option>
+      {treneri.map((t) => (
+        <option key={t.id} value={t.id}>{t.ime}</option>
+      ))}
+      <option value="__novi__">+ dodaj novog trenera…</option>
+    </select>
+  )
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: boja.pozadina, color: boja.tekst, minHeight: '100vh', padding: 16 }}>
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, margin: '8px 0 12px' }}>Kalendar treninga</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 12px' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Kalendar treninga</h1>
+          <button onClick={() => setPrikaziRaspored(!prikaziRaspored)} style={dugmeMalo}>
+            {prikaziRaspored ? 'Zatvori raspored' : 'Raspored'}
+          </button>
+        </div>
+
+        {prikaziRaspored && (
+          <div style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Ponavljajući raspored</div>
+            <p style={{ fontSize: 13, color: boja.meki, marginTop: 0 }}>
+              Definiši termine grupa po danima, pa klikni „Generiši" da se treninzi automatski upišu za prikazani mesec.
+            </p>
+
+            {raspored.length === 0 ? (
+              <p style={{ fontSize: 13, color: boja.meki }}>Još nema definisanih termina.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                {raspored.map((s) => (
+                  <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, borderLeft: `3px solid ${grupaBoja(s.grupa_id)}`, background: boja.pozadina, borderRadius: '0 8px 8px 0', padding: '6px 10px' }}>
+                    <div>
+                      <b>{labelaGrupe(grupaMap.get(s.grupa_id))}</b> · {DANI_PUN[s.dan_u_nedelji - 1]} {s.vreme ? s.vreme.slice(0, 5) : ''}
+                      {s.mesto ? ` · ${s.mesto}` : ''}{s.trener_id ? ` · ${trenerMap.get(s.trener_id)}` : ''}
+                    </div>
+                    <button onClick={() => obrisiSlot(s.id)} style={{ border: 'none', background: 'none', color: boja.greska, cursor: 'pointer', fontSize: 16 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ borderTop: `1px solid ${boja.ivica}`, paddingTop: 10 }}>
+              <div style={{ marginBottom: 8 }}>
+                <label style={stilLabela}>Grupa</label>
+                <select style={stilInput} value={rGrupa} onChange={(e) => setRGrupa(e.target.value)}>
+                  <option value="">— izaberi —</option>
+                  {grupe.map((g) => (
+                    <option key={g.id} value={g.id}>{labelaGrupe(g)}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={stilLabela}>Dan</label>
+                  <select style={stilInput} value={rDan} onChange={(e) => setRDan(Number(e.target.value))}>
+                    {DANI_PUN.map((d, i) => (
+                      <option key={i} value={i + 1}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={stilLabela}>Vreme</label>
+                  <input type="time" style={stilInput} value={rVreme} onChange={(e) => setRVreme(e.target.value)} />
+                </div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <label style={stilLabela}>Mesto / hala</label>
+                <input style={stilInput} value={rMesto} onChange={(e) => setRMesto(e.target.value)} />
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <label style={stilLabela}>Trener</label>
+                {trenerSelect(rTrener, setRTrener)}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={dodajSlot} style={dugmeMalo}>+ Dodaj termin u raspored</button>
+                <button onClick={generisi} disabled={radi} style={{ ...dugmeMalo, background: boja.akcenat, color: '#fff', border: 'none', fontWeight: 600, marginLeft: 'auto' }}>
+                  {radi ? 'Generišem...' : `Generiši za ${MESECI[mesecDatum.getMonth()]}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <button onClick={() => pomeriMesec(-1)} style={dugmeMalo}>‹</button>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>
-            {MESECI[mesecDatum.getMonth()]} {mesecDatum.getFullYear()}
-          </div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>{MESECI[mesecDatum.getMonth()]} {mesecDatum.getFullYear()}</div>
           <button onClick={() => pomeriMesec(1)} style={dugmeMalo}>›</button>
         </div>
 
@@ -317,9 +499,7 @@ export default function TreninziScreen() {
                   color: boja.tekst,
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: danas ? 700 : 400, color: danas ? boja.akcenat : boja.tekst }}>
-                  {Number(dan.slice(8, 10))}
-                </div>
+                <div style={{ fontSize: 12, fontWeight: danas ? 700 : 400, color: danas ? boja.akcenat : boja.tekst }}>{Number(dan.slice(8, 10))}</div>
                 <div style={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', minHeight: 6 }}>
                   {t.slice(0, 4).map((x) => (
                     <span key={x.id} style={{ width: 5, height: 5, borderRadius: '50%', background: grupaBoja(x.grupa_id) }} />
@@ -330,18 +510,18 @@ export default function TreninziScreen() {
           })}
         </div>
 
-        {poruka && (
-          <p style={{ fontSize: 14, color: poruka.tip === 'greska' ? boja.greska : boja.uspeh, marginTop: 12 }}>{poruka.tekst}</p>
-        )}
+        {poruka && <p style={{ fontSize: 14, color: poruka.tip === 'greska' ? boja.greska : boja.uspeh, marginTop: 12 }}>{poruka.tekst}</p>}
 
         {izabraniDan && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ fontSize: 15, fontWeight: 600 }}>Termini · {izabraniDan.split('-').reverse().join('.')}.</div>
-              {!prikaziFormu && (
-                <button onClick={() => setPrikaziFormu(true)} style={dugmeMalo}>+ Novi trening</button>
-              )}
+              {!prikaziFormu && <button onClick={() => setPrikaziFormu(true)} style={dugmeMalo}>+ Novi trening</button>}
             </div>
+
+            {preklapanja.size > 0 && (
+              <p style={{ fontSize: 13, color: boja.akcenat, marginTop: 0 }}>⚠ Preklapanje: dva termina u istoj hali u isto vreme.</p>
+            )}
 
             {prikaziFormu && (
               <div style={{ background: boja.karta, border: `1px solid ${boja.akcenat}`, borderRadius: 12, padding: 12, marginBottom: 10 }}>
@@ -366,22 +546,7 @@ export default function TreninziScreen() {
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <label style={stilLabela}>Trener</label>
-                  <select
-                    style={stilInput}
-                    value={noviTrener}
-                    onChange={async (e) => {
-                      if (e.target.value === '__novi__') {
-                        const id = await dodajTrenera()
-                        if (id) setNoviTrener(id)
-                      } else setNoviTrener(e.target.value)
-                    }}
-                  >
-                    <option value="">— bez trenera —</option>
-                    {treneri.map((t) => (
-                      <option key={t.id} value={t.id}>{t.ime}</option>
-                    ))}
-                    <option value="__novi__">+ dodaj novog trenera…</option>
-                  </select>
+                  {trenerSelect(noviTrener, setNoviTrener)}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={sacuvajNovi} disabled={radi} style={{ ...dugmeMalo, background: boja.akcenat, color: '#fff', border: 'none', fontWeight: 600, flex: 1 }}>
@@ -400,13 +565,12 @@ export default function TreninziScreen() {
                   const g = grupaMap.get(t.grupa_id)
                   const st = STATUS[t.status] ?? STATUS.planiran
                   const otvoren = otvoreniId === t.id
+                  const sukob = preklapanja.has(t.id)
                   return (
-                    <div key={t.id} style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderLeft: `3px solid ${grupaBoja(t.grupa_id)}`, borderRadius: 10, padding: '10px 12px' }}>
+                    <div key={t.id} style={{ background: boja.karta, border: `1px solid ${sukob ? boja.akcenat : boja.ivica}`, borderLeft: `3px solid ${grupaBoja(t.grupa_id)}`, borderRadius: 10, padding: '10px 12px' }}>
                       <div onClick={() => otvori(t)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', gap: 8 }}>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>
-                            {t.vreme ? t.vreme.slice(0, 5) + ' · ' : ''}{labelaGrupe(g)}
-                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600 }}>{t.vreme ? t.vreme.slice(0, 5) + ' · ' : ''}{labelaGrupe(g)}</div>
                           <div style={{ fontSize: 12, color: boja.meki }}>
                             {[t.mesto, t.trener_id ? trenerMap.get(t.trener_id) : null].filter(Boolean).join(' · ') || 'bez detalja'}
                           </div>
@@ -436,22 +600,7 @@ export default function TreninziScreen() {
                           </div>
                           <div style={{ marginBottom: 8 }}>
                             <label style={stilLabela}>Trener</label>
-                            <select
-                              style={stilInput}
-                              value={edit.trener_id}
-                              onChange={async (e) => {
-                                if (e.target.value === '__novi__') {
-                                  const id = await dodajTrenera()
-                                  if (id) setEdit({ ...edit, trener_id: id })
-                                } else setEdit({ ...edit, trener_id: e.target.value })
-                              }}
-                            >
-                              <option value="">— bez trenera —</option>
-                              {treneri.map((tr) => (
-                                <option key={tr.id} value={tr.id}>{tr.ime}</option>
-                              ))}
-                              <option value="__novi__">+ dodaj novog trenera…</option>
-                            </select>
+                            {trenerSelect(edit.trener_id, (v) => setEdit({ ...edit, trener_id: v }))}
                           </div>
                           <div style={{ marginBottom: 8 }}>
                             <label style={stilLabela}>Plan i program</label>
@@ -484,15 +633,7 @@ export default function TreninziScreen() {
                                       else s.add(d.id)
                                       setPrisutni(s)
                                     }}
-                                    style={{
-                                      fontSize: 13,
-                                      padding: '6px 10px',
-                                      borderRadius: 16,
-                                      cursor: 'pointer',
-                                      border: `1px solid ${p ? boja.uspeh : boja.ivica}`,
-                                      background: p ? '#eaf3ea' : boja.karta,
-                                      color: p ? boja.uspeh : boja.meki,
-                                    }}
+                                    style={{ fontSize: 13, padding: '6px 10px', borderRadius: 16, cursor: 'pointer', border: `1px solid ${p ? boja.uspeh : boja.ivica}`, background: p ? '#eaf3ea' : boja.karta, color: p ? boja.uspeh : boja.meki }}
                                   >
                                     {p ? '✓ ' : ''}{d.ime}
                                   </button>
