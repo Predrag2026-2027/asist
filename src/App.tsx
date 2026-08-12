@@ -4,10 +4,11 @@ import { supabase } from './lib/supabase'
 import PorodiceScreen from './features/porodice/PorodiceScreen'
 import ClanarineScreen from './features/clanarine/ClanarineScreen'
 import TreninziScreen from './features/treninzi/TreninziScreen'
+import StatistikaScreen from './features/statistika/StatistikaScreen'
 import UvozScreen from './features/uvoz/UvozScreen'
 import LoginScreen from './features/auth/LoginScreen'
 
-type Tab = 'porodice' | 'clanarine' | 'treninzi' | 'uvoz'
+type Tab = 'porodice' | 'clanarine' | 'treninzi' | 'statistika' | 'uvoz'
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -40,10 +41,10 @@ function App() {
       onClick={() => setTab(t)}
       style={{
         flex: 1,
-        padding: '12px 6px',
+        padding: '12px 4px',
         border: 'none',
         background: 'none',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: tab === t ? 600 : 400,
         color: tab === t ? '#c2410c' : '#6b6a64',
         borderBottom: tab === t ? '2px solid #c2410c' : '2px solid transparent',
@@ -72,6 +73,7 @@ function App() {
             {dugme('porodice', 'Porodice')}
             {dugme('clanarine', 'Članarine')}
             {dugme('treninzi', 'Treninzi')}
+            {dugme('statistika', 'Statistika')}
             {dugme('uvoz', 'Uvoz')}
           </div>
           <button
@@ -80,9 +82,9 @@ function App() {
               border: 'none',
               background: 'none',
               color: '#6b6a64',
-              fontSize: 13,
+              fontSize: 12,
               cursor: 'pointer',
-              padding: '0 12px',
+              padding: '0 10px',
             }}
           >
             Odjava
@@ -92,6 +94,7 @@ function App() {
       {tab === 'porodice' && <PorodiceScreen />}
       {tab === 'clanarine' && <ClanarineScreen />}
       {tab === 'treninzi' && <TreninziScreen />}
+      {tab === 'statistika' && <StatistikaScreen />}
       {tab === 'uvoz' && <UvozScreen />}
     </div>
   )
