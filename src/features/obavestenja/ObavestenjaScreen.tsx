@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 
 type Grupa = { id: string; naziv: string; uzrast_oznaka: string | null }
 type Duznik = { naziv: string; telefon: string | null; preostalo: number }
+type Sopstveno = { id: string; naziv: string; tekst: string }
 
 const boja = {
   tekst: '#1c1c1a',
@@ -45,6 +46,32 @@ const stilInput: React.CSSProperties = {
   background: '#fff',
   color: boja.tekst,
 }
+const dugme: React.CSSProperties = {
+  background: boja.akcenat,
+  color: '#fff',
+  border: 'none',
+  borderRadius: 8,
+  padding: '8px 14px',
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: 'pointer',
+}
+const dugmeMalo: React.CSSProperties = {
+  background: 'none',
+  border: `1px solid ${boja.ivica}`,
+  borderRadius: 8,
+  padding: '6px 12px',
+  cursor: 'pointer',
+  fontSize: 13,
+  color: boja.tekst,
+}
+const kartaStil: React.CSSProperties = {
+  background: boja.karta,
+  border: `1px solid ${boja.ivica}`,
+  borderRadius: 12,
+  padding: 14,
+  marginTop: 12,
+}
 
 export default function ObavestenjaScreen() {
   const [sezonaId, setSezonaId] = useState<string | null>(null)
@@ -61,6 +88,12 @@ export default function ObavestenjaScreen() {
   const [tekstPodsetnik, setTekstPodsetnik] = useState('')
   const [duznici, setDuznici] = useState<Duznik[]>([])
 
+  const [mojaLista, setMojaLista] = useState<Sopstveno[]>([])
+  const [mNaziv, setMNaziv] = useState('')
+  const [mTekst, setMTekst] = useState('')
+  const [mEditId, setMEditId] = useState<string | null>(null)
+  const [mPoruka, setMPoruka] = useState<string | null>(null)
+
   async function ucitajOsnovu() {
     const { data: sez } = await supabase.from('sezone').select('id, datum_od').eq('aktivna', true).maybeSingle()
     const s = sez as any
@@ -71,6 +104,12 @@ export default function ObavestenjaScreen() {
     setGrupe(new Map(((g as any[]) ?? []).map((x) => [x.id, x])))
     const { data: cen } = await supabase.from('cenovnik').select('iznos_1_dete, iznos_2_dete, iznos_3plus').eq('sezona_id', s.id).order('vazi_od', { ascending: false }).limit(1).maybeSingle()
     if (cen) setCenovnik({ i1: Number((cen as any).iznos_1_dete), i2: Number((cen as any).iznos_2_dete), i3: Number((cen as any).iznos_3plus) })
+    await ucitajMoja()
+  }
+
+  async function ucitajMoja() {
+    const { data } = await supabase.from('obavestenja').select('id, naziv, tekst').order('created_at', { ascending: false })
+    setMojaLista((data as any) ?? [])
   }
 
   useEffect(() => {
@@ -197,34 +236,102 @@ export default function ObavestenjaScreen() {
     ].join('\n')
   }
 
-  const dugme: React.CSSProperties = {
-    background: boja.akcenat,
-    color: '#fff',
-    border: 'none',
-    borderRadius: 8,
-    padding: '8px 14px',
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: 'pointer',
+  async function sacuvajMoje() {
+    setMPoruka(null)
+    if (!mNaziv.trim() || !mTekst.trim()) {
+      setMPoruka('Unesi naziv i tekst.')
+      return
+    }
+    if (mEditId) {
+      const { error } = await supabase.from('obavestenja').update({ naziv: mNaziv.trim(), tekst: mTekst }).eq('id', mEditId)
+      if (error) {
+        setMPoruka('Greška: ' + error.message)
+        return
+      }
+    } else {
+      const { error } = await supabase.from('obavestenja').insert({ sezona_id: sezonaId, naziv: mNaziv.trim(), tekst: mTekst })
+      if (error) {
+        setMPoruka('Greška: ' + error.message)
+        return
+      }
+    }
+    setMNaziv('')
+    setMTekst('')
+    setMEditId(null)
+    setMPoruka('Sačuvano.')
+    await ucitajMoja()
   }
-  const dugmeMalo: React.CSSProperties = {
-    background: 'none',
-    border: `1px solid ${boja.ivica}`,
-    borderRadius: 8,
-    padding: '6px 12px',
-    cursor: 'pointer',
-    fontSize: 13,
-    color: boja.tekst,
+
+  function izmeniMoje(o: Sopstveno) {
+    setMEditId(o.id)
+    setMNaziv(o.naziv)
+    setMTekst(o.tekst)
+    setMPoruka(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  async function obrisiMoje(id: string) {
+    if (!window.confirm('Obrisati ovo obaveštenje?')) return
+    const { error } = await supabase.from('obavestenja').delete().eq('id', id)
+    if (!error) {
+      if (mEditId === id) {
+        setMEditId(null)
+        setMNaziv('')
+        setMTekst('')
+      }
+      await ucitajMoja()
+    }
+  }
+
   const oznaka = (k: string) => (kopiran === k ? '✓ Kopirano' : 'Kopiraj')
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: boja.pozadina, color: boja.tekst, minHeight: '100vh', padding: 16 }}>
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, margin: '8px 0 2px' }}>Obaveštenja</h1>
-        <p style={{ color: boja.meki, marginTop: 0, fontSize: 14 }}>Generiši tekst i nalepi ga u Viber grupu.</p>
+        <p style={{ color: boja.meki, marginTop: 0, fontSize: 14 }}>Generiši ili napiši tekst i nalepi ga u Viber grupu.</p>
 
-        <div style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+        <div style={kartaStil}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+            {mEditId ? 'Izmena obaveštenja' : 'Novo obaveštenje'}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 12, color: boja.meki }}>Naziv</label>
+            <input style={stilInput} value={mNaziv} onChange={(e) => setMNaziv(e.target.value)} placeholder="npr. Turnir u subotu" />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 12, color: boja.meki }}>Tekst</label>
+            <textarea style={{ ...stilInput, minHeight: 120, fontFamily: 'system-ui', resize: 'vertical' }} value={mTekst} onChange={(e) => setMTekst(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button onClick={sacuvajMoje} style={dugme}>{mEditId ? 'Sačuvaj izmene' : 'Sačuvaj'}</button>
+            {mEditId && (
+              <button onClick={() => { setMEditId(null); setMNaziv(''); setMTekst(''); setMPoruka(null) }} style={dugmeMalo}>Otkaži</button>
+            )}
+            {mPoruka && <span style={{ fontSize: 13, color: mPoruka.startsWith('Greška') ? boja.greska : boja.uspeh }}>{mPoruka}</span>}
+          </div>
+
+          {mojaLista.length > 0 && (
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Sačuvana obaveštenja</div>
+              {mojaLista.map((o) => (
+                <div key={o.id} style={{ border: `1px solid ${boja.ivica}`, borderRadius: 8, padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{o.naziv}</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => kopiraj(o.tekst, 'm' + o.id)} style={dugmeMalo}>{oznaka('m' + o.id)}</button>
+                      <button onClick={() => izmeniMoje(o)} style={dugmeMalo}>Izmeni</button>
+                      <button onClick={() => obrisiMoje(o.id)} style={{ ...dugmeMalo, color: boja.greska }}>×</button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13, color: boja.meki, marginTop: 4, whiteSpace: 'pre-wrap' }}>{o.tekst}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={kartaStil}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Raspored treninga za nedelju</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
@@ -235,13 +342,13 @@ export default function ObavestenjaScreen() {
           </div>
           {tekstRaspored && (
             <>
-              <textarea readOnly value={tekstRaspored} style={{ ...stilInput, minHeight: 140, fontFamily: 'system-ui', resize: 'vertical' }} />
+              <textarea value={tekstRaspored} onChange={(e) => setTekstRaspored(e.target.value)} style={{ ...stilInput, minHeight: 140, fontFamily: 'system-ui', resize: 'vertical' }} />
               <button onClick={() => kopiraj(tekstRaspored, 'raspored')} style={{ ...dugme, marginTop: 8 }}>{oznaka('raspored')}</button>
             </>
           )}
         </div>
 
-        <div style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+        <div style={kartaStil}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Podsetnik za članarinu</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
@@ -286,7 +393,7 @@ export default function ObavestenjaScreen() {
         </div>
 
         <p style={{ fontSize: 12, color: boja.meki, marginTop: 12 }}>
-          Napomena: grupna poruka ide u Viber grupu, a privatne poruke dužnicima šalji pojedinačno (da se ne objavljuju imena dužnika javno).
+          Napomena: grupne poruke idu u Viber grupu, a privatne poruke dužnicima šalji pojedinačno.
         </p>
       </div>
     </div>
