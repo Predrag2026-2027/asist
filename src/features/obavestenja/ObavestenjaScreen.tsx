@@ -2,12 +2,7 @@
 import { supabase } from '../../lib/supabase'
 
 type Grupa = { id: string; naziv: string; uzrast_oznaka: string | null }
-type Porodica = {
-  id: string
-  prezime: string
-  telefon: string | null
-  clanovi: { id: string; ime: string; datum_rodjenja: string | null }[]
-}
+type Duznik = { naziv: string; telefon: string | null; preostalo: number }
 
 const boja = {
   tekst: '#1c1c1a',
@@ -17,20 +12,20 @@ const boja = {
   karta: '#ffffff',
   akcenat: '#c2410c',
   uspeh: '#15803d',
+  greska: '#b91c1c',
 }
-
 const MESECI: Record<number, string> = {
   1: 'Januar', 2: 'Februar', 3: 'Mart', 4: 'April', 5: 'Maj', 6: 'Jun',
   7: 'Jul', 8: 'Avgust', 9: 'Septembar', 10: 'Oktobar', 11: 'Novembar', 12: 'Decembar',
 }
-const DANI_PUN = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja']
+const DANI = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja']
 
 function fmt(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
-function ddmm(s: string): string {
-  const [, m, d] = s.split('-')
-  return `${d}.${m}.`
+function ddmm(d: string): string {
+  const [, m, dan] = d.split('-')
+  return `${dan}.${m}.`
 }
 function formatRSD(n: number): string {
   return new Intl.NumberFormat('sr-RS', { minimumFractionDigits: 0 }).format(n) + ' RSD'
@@ -39,12 +34,9 @@ function labelaGrupe(g?: Grupa): string {
   if (!g) return ''
   return g.uzrast_oznaka ? `${g.naziv} ${g.uzrast_oznaka}` : g.naziv
 }
-function nazivPorodice(p: Porodica): string {
-  const imena = [...p.clanovi].sort((a, b) => (a.datum_rodjenja ?? '').localeCompare(b.datum_rodjenja ?? '')).map((d) => d.ime)
-  return imena.length ? `${p.prezime} (${imena.join(', ')})` : p.prezime
-}
 
 const stilInput: React.CSSProperties = {
+  width: '100%',
   padding: '8px 10px',
   border: `1px solid ${boja.ivica}`,
   borderRadius: 8,
@@ -57,53 +49,73 @@ const stilInput: React.CSSProperties = {
 export default function ObavestenjaScreen() {
   const [sezonaId, setSezonaId] = useState<string | null>(null)
   const [pocetnaGodina, setPocetnaGodina] = useState(new Date().getFullYear())
-  const [grupe, setGrupe] = useState<Grupa[]>([])
-  const [porodice, setPorodice] = useState<Porodica[]>([])
-  const [brojDece, setBrojDece] = useState<Record<string, number>>({})
+  const [grupe, setGrupe] = useState<Map<string, Grupa>>(new Map())
   const [cenovnik, setCenovnik] = useState<{ i1: number; i2: number; i3: number } | null>(null)
+  const [kopiran, setKopiran] = useState<string | null>(null)
 
-  const [tip, setTip] = useState<'raspored' | 'clanarina' | 'duznici'>('raspored')
-  const [mesec, setMesec] = useState(9)
-  const [nedelja, setNedelja] = useState(() => {
-    const d = new Date()
-    const day = (d.getDay() + 6) % 7
-    const m = new Date(d)
-    m.setDate(d.getDate() - day)
-    return fmt(m)
-  })
-  const [tekst, setTekst] = useState('')
-  const [radi, setRadi] = useState(false)
-  const [kopirano, setKopirano] = useState(false)
+  const [datumNedelje, setDatumNedelje] = useState(() => new Date().toISOString().slice(0, 10))
+  const [tekstRaspored, setTekstRaspored] = useState('')
 
   const meseci = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8]
+  const [mesec, setMesec] = useState(9)
+  const [tekstPodsetnik, setTekstPodsetnik] = useState('')
+  const [duznici, setDuznici] = useState<Duznik[]>([])
+
+  async function ucitajOsnovu() {
+    const { data: sez } = await supabase.from('sezone').select('id, datum_od').eq('aktivna', true).maybeSingle()
+    const s = sez as any
+    if (!s) return
+    setSezonaId(s.id)
+    setPocetnaGodina(s.datum_od ? new Date(s.datum_od).getFullYear() : new Date().getFullYear())
+    const { data: g } = await supabase.from('grupe').select('id, naziv, uzrast_oznaka').eq('sezona_id', s.id)
+    setGrupe(new Map(((g as any[]) ?? []).map((x) => [x.id, x])))
+    const { data: cen } = await supabase.from('cenovnik').select('iznos_1_dete, iznos_2_dete, iznos_3plus').eq('sezona_id', s.id).order('vazi_od', { ascending: false }).limit(1).maybeSingle()
+    if (cen) setCenovnik({ i1: Number((cen as any).iznos_1_dete), i2: Number((cen as any).iznos_2_dete), i3: Number((cen as any).iznos_3plus) })
+  }
 
   useEffect(() => {
-    ;(async () => {
-      const { data: sez } = await supabase.from('sezone').select('id, datum_od').eq('aktivna', true).maybeSingle()
-      const s = sez as any
-      if (!s) return
-      setSezonaId(s.id)
-      setPocetnaGodina(s.datum_od ? new Date(s.datum_od).getFullYear() : new Date().getFullYear())
-
-      const { data: g } = await supabase.from('grupe').select('id, naziv, uzrast_oznaka').eq('sezona_id', s.id)
-      setGrupe((g as any) ?? [])
-
-      const { data: cen } = await supabase.from('cenovnik').select('iznos_1_dete, iznos_2_dete, iznos_3plus').eq('sezona_id', s.id).order('vazi_od', { ascending: false }).limit(1).maybeSingle()
-      if (cen) setCenovnik({ i1: Number((cen as any).iznos_1_dete), i2: Number((cen as any).iznos_2_dete), i3: Number((cen as any).iznos_3plus) })
-
-      const { data: por } = await supabase.from('porodice').select('id, prezime, telefon, clanovi(id, ime, datum_rodjenja)').order('prezime')
-      setPorodice((por as any) ?? [])
-
-      const { data: cl } = await supabase.from('clanstvo').select('clan_id').eq('sezona_id', s.id).eq('maticno', true).is('datum_do', null)
-      const upisani = new Set(((cl as any[]) ?? []).map((x) => x.clan_id))
-      const { data: clanovi } = await supabase.from('clanovi').select('id, porodica_id, status')
-      const bm: Record<string, number> = {}
-      for (const c of (clanovi as any[]) ?? []) if (c.status === 'aktivan' && upisani.has(c.id)) bm[c.porodica_id] = (bm[c.porodica_id] ?? 0) + 1
-      setBrojDece(bm)
-    })()
+    ucitajOsnovu()
   }, [])
 
-  function iznosZaBroj(n: number): number {
+  async function generisiRaspored() {
+    if (!sezonaId) return
+    const dt = new Date(datumNedelje + 'T00:00:00')
+    const dow = (dt.getDay() + 6) % 7
+    const mon = new Date(dt)
+    mon.setDate(dt.getDate() - dow)
+    const dani: string[] = []
+    for (let i = 0; i < 7; i++) {
+      const x = new Date(mon)
+      x.setDate(mon.getDate() + i)
+      dani.push(fmt(x))
+    }
+    const { data } = await supabase
+      .from('treninzi')
+      .select('datum, vreme, mesto, grupa_id, status')
+      .eq('sezona_id', sezonaId)
+      .gte('datum', dani[0])
+      .lte('datum', dani[6])
+      .neq('status', 'otkazan')
+      .order('vreme')
+    const treninzi = (data as any[]) ?? []
+
+    const linije: string[] = [`Raspored treninga (${ddmm(dani[0])} - ${ddmm(dani[6])})`, '']
+    for (let i = 0; i < 7; i++) {
+      const dnevni = treninzi.filter((t) => t.datum === dani[i])
+      if (dnevni.length === 0) continue
+      linije.push(`${DANI[i]} ${ddmm(dani[i])}`)
+      for (const t of dnevni) {
+        const v = t.vreme ? t.vreme.slice(0, 5) + ' ' : ''
+        const m = t.mesto ? ' — ' + t.mesto : ''
+        linije.push(`- ${v}${labelaGrupe(grupe.get(t.grupa_id))}${m}`)
+      }
+      linije.push('')
+    }
+    linije.push('KK BB Basket')
+    setTekstRaspored(linije.join('\n').trim())
+  }
+
+  function iznosZa(n: number): number {
     if (!cenovnik || n <= 0) return 0
     let s = 0
     if (n >= 1) s += cenovnik.i1
@@ -112,151 +124,170 @@ export default function ObavestenjaScreen() {
     return s
   }
 
-  async function generisi() {
-    setRadi(true)
-    setKopirano(false)
-    try {
-      if (tip === 'clanarina') {
-        const g = mesec >= 9 ? pocetnaGodina : pocetnaGodina + 1
-        setTekst(
-          `Poštovani roditelji,\n\nPodsećamo da je članarina za ${MESECI[mesec]} ${g}. dospela za uplatu. Molimo vas da izmirite obavezu u toku meseca.\n\nHvala na saradnji,\nKK BB Basket`
-        )
-      } else if (tip === 'raspored') {
-        const start = new Date(nedelja + 'T00:00:00')
-        const end = new Date(start)
-        end.setDate(start.getDate() + 6)
-        const grupaMap = new Map(grupe.map((x) => [x.id, x]))
-        const { data } = await supabase
-          .from('treninzi')
-          .select('grupa_id, datum, vreme, mesto, status')
-          .eq('sezona_id', sezonaId)
-          .gte('datum', fmt(start))
-          .lte('datum', fmt(end))
-          .order('datum')
-          .order('vreme')
-        const poDanu = new Map<string, any[]>()
-        for (const t of (data as any[]) ?? []) {
-          const arr = poDanu.get(t.datum) ?? []
-          arr.push(t)
-          poDanu.set(t.datum, arr)
-        }
-        let out = `RASPORED TRENINGA (${ddmm(fmt(start))}–${ddmm(fmt(end))})\n`
-        let imaTermina = false
-        for (let i = 0; i < 7; i++) {
-          const dan = new Date(start)
-          dan.setDate(start.getDate() + i)
-          const key = fmt(dan)
-          const lista = poDanu.get(key)
-          if (!lista || !lista.length) continue
-          imaTermina = true
-          out += `\n${DANI_PUN[i]} ${ddmm(key)}\n`
-          for (const t of lista) {
-            const v = t.vreme ? t.vreme.slice(0, 5) + ' ' : ''
-            const m = t.mesto ? ' — ' + t.mesto : ''
-            const otk = t.status === 'otkazan' ? ' (OTKAZANO)' : ''
-            out += `  ${v}${labelaGrupe(grupaMap.get(t.grupa_id))}${m}${otk}\n`
-          }
-        }
-        if (!imaTermina) out += '\nNema zakazanih treninga za ovu nedelju.\n'
-        out += '\nKK BB Basket'
-        setTekst(out)
-      } else {
-        const g = mesec >= 9 ? pocetnaGodina : pocetnaGodina + 1
-        const period = `${g}-${String(mesec).padStart(2, '0')}-01`
-        const { data: zad } = await supabase.from('zaduzenja').select('porodica_id, iznos_ukupno, uplate(iznos)').eq('sezona_id', sezonaId).eq('period', period)
-        const mapZ = new Map<string, { ukupno: number; uplaceno: number }>()
-        for (const z of (zad as any[]) ?? []) {
-          const upl = (z.uplate ?? []).reduce((s: number, u: any) => s + Number(u.iznos), 0)
-          mapZ.set(z.porodica_id, { ukupno: Number(z.iznos_ukupno), uplaceno: upl })
-        }
-        const duznici: { label: string; dug: number; tel: string | null }[] = []
-        for (const p of porodice) {
-          const n = brojDece[p.id] ?? 0
-          if (n <= 0) continue
-          const z = mapZ.get(p.id)
-          const ukupno = z?.ukupno ?? iznosZaBroj(n)
-          const uplaceno = z?.uplaceno ?? 0
-          const dug = ukupno - uplaceno
-          if (dug > 0) duznici.push({ label: nazivPorodice(p), dug, tel: p.telefon })
-        }
-        duznici.sort((a, b) => b.dug - a.dug)
-        let out = `DUŽNICI — ${MESECI[mesec]} ${g}.\n\n`
-        if (duznici.length === 0) out += 'Nema dužnika za ovaj mesec.'
-        else {
-          for (const d of duznici) out += `${d.label} — duguje ${formatRSD(d.dug)}${d.tel ? ' (' + d.tel + ')' : ''}\n`
-          const ukupanDug = duznici.reduce((s, d) => s + d.dug, 0)
-          out += `\nUkupno dužnika: ${duznici.length} · ukupan dug: ${formatRSD(ukupanDug)}`
-        }
-        setTekst(out)
+  async function generisiPodsetnik() {
+    if (!sezonaId) return
+    const godina = mesec >= 9 ? pocetnaGodina : pocetnaGodina + 1
+    const period = `${godina}-${String(mesec).padStart(2, '0')}-01`
+
+    setTekstPodsetnik(
+      [
+        'Poštovani roditelji,',
+        '',
+        `Podsećamo vas da je članarina za ${MESECI[mesec]} ${godina}. dospela za naplatu.`,
+        'Molimo vas da je izmirite na treningu ili dogovorom sa administracijom.',
+        '',
+        'Hvala na saradnji!',
+        'KK BB Basket',
+      ].join('\n')
+    )
+
+    const { data: cl } = await supabase.from('clanstvo').select('clan_id').eq('sezona_id', sezonaId).eq('maticno', true).is('datum_do', null)
+    const upisani = new Set(((cl as any[]) ?? []).map((x) => x.clan_id))
+    const { data: clanovi } = await supabase.from('clanovi').select('id, porodica_id, status')
+    const broj: Record<string, number> = {}
+    for (const c of (clanovi as any[]) ?? []) {
+      if (c.status === 'aktivan' && upisani.has(c.id)) broj[c.porodica_id] = (broj[c.porodica_id] ?? 0) + 1
+    }
+    const { data: por } = await supabase.from('porodice').select('id, prezime, telefon, clanovi(ime, datum_rodjenja)').order('prezime')
+    const { data: zad } = await supabase.from('zaduzenja').select('porodica_id, iznos_ukupno, uplate(iznos)').eq('sezona_id', sezonaId).eq('period', period)
+    const zaduzenjaMap: Record<string, { ukupno: number; uplaceno: number }> = {}
+    for (const z of (zad as any[]) ?? []) {
+      const uplaceno = (z.uplate ?? []).reduce((s: number, u: any) => s + Number(u.iznos), 0)
+      zaduzenjaMap[z.porodica_id] = { ukupno: Number(z.iznos_ukupno), uplaceno }
+    }
+
+    const lista: Duznik[] = []
+    for (const p of (por as any[]) ?? []) {
+      const n = broj[p.id] ?? 0
+      if (n === 0) continue
+      const z = zaduzenjaMap[p.id]
+      const ukupno = z?.ukupno ?? iznosZa(n)
+      const uplaceno = z?.uplaceno ?? 0
+      const preostalo = ukupno - uplaceno
+      if (preostalo > 0) {
+        const imena = [...p.clanovi].sort((a: any, b: any) => (a.datum_rodjenja ?? '').localeCompare(b.datum_rodjenja ?? '')).map((d: any) => d.ime)
+        lista.push({ naziv: `${p.prezime} (${imena.join(', ')})`, telefon: p.telefon, preostalo })
       }
-    } finally {
-      setRadi(false)
+    }
+    setDuznici(lista)
+  }
+
+  async function kopiraj(tekst: string, kljuc: string) {
+    try {
+      await navigator.clipboard.writeText(tekst)
+      setKopiran(kljuc)
+      setTimeout(() => setKopiran(null), 1500)
+    } catch {
+      setKopiran('greska')
+      setTimeout(() => setKopiran(null), 1500)
     }
   }
 
-  async function kopiraj() {
-    try {
-      await navigator.clipboard.writeText(tekst)
-      setKopirano(true)
-      setTimeout(() => setKopirano(false), 2000)
-    } catch {
-      setKopirano(false)
-    }
+  function porukaDuzniku(d: Duznik): string {
+    const godina = mesec >= 9 ? pocetnaGodina : pocetnaGodina + 1
+    return [
+      'Poštovani,',
+      '',
+      `Prema našoj evidenciji, članarina za ${MESECI[mesec]} ${godina}. za porodicu ${d.naziv} nije u potpunosti izmirena.`,
+      `Preostali iznos: ${formatRSD(d.preostalo)}.`,
+      'Molimo vas da je izmirite u najkraćem roku.',
+      '',
+      'Hvala!',
+      'KK BB Basket',
+    ].join('\n')
   }
+
+  const dugme: React.CSSProperties = {
+    background: boja.akcenat,
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    padding: '8px 14px',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  }
+  const dugmeMalo: React.CSSProperties = {
+    background: 'none',
+    border: `1px solid ${boja.ivica}`,
+    borderRadius: 8,
+    padding: '6px 12px',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: boja.tekst,
+  }
+  const oznaka = (k: string) => (kopiran === k ? '✓ Kopirano' : 'Kopiraj')
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', background: boja.pozadina, color: boja.tekst, minHeight: '100vh', padding: 16 }}>
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, margin: '8px 0 2px' }}>Obaveštenja</h1>
-        <p style={{ color: boja.meki, marginTop: 0, fontSize: 14 }}>Generiši tekst za Viber grupu ili SMS.</p>
+        <p style={{ color: boja.meki, marginTop: 0, fontSize: 14 }}>Generiši tekst i nalepi ga u Viber grupu.</p>
 
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ display: 'block', fontSize: 13, color: boja.meki, marginBottom: 4 }}>Vrsta obaveštenja</label>
-          <select style={{ ...stilInput, width: '100%' }} value={tip} onChange={(e) => { setTip(e.target.value as any); setTekst('') }}>
-            <option value="raspored">Raspored treninga za nedelju (grupno)</option>
-            <option value="clanarina">Podsetnik za članarinu (grupno)</option>
-            <option value="duznici">Spisak dužnika (za privatne poruke)</option>
-          </select>
+        <div style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Raspored treninga za nedelju</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, color: boja.meki }}>Bilo koji dan u željenoj nedelji</label>
+              <input type="date" style={stilInput} value={datumNedelje} onChange={(e) => setDatumNedelje(e.target.value)} />
+            </div>
+            <button onClick={generisiRaspored} style={dugmeMalo}>Generiši</button>
+          </div>
+          {tekstRaspored && (
+            <>
+              <textarea readOnly value={tekstRaspored} style={{ ...stilInput, minHeight: 140, fontFamily: 'system-ui', resize: 'vertical' }} />
+              <button onClick={() => kopiraj(tekstRaspored, 'raspored')} style={{ ...dugme, marginTop: 8 }}>{oznaka('raspored')}</button>
+            </>
+          )}
         </div>
 
-        {tip === 'raspored' ? (
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ display: 'block', fontSize: 13, color: boja.meki, marginBottom: 4 }}>Nedelja počinje (ponedeljak)</label>
-            <input type="date" style={{ ...stilInput, width: '100%' }} value={nedelja} onChange={(e) => setNedelja(e.target.value)} />
-          </div>
-        ) : (
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ display: 'block', fontSize: 13, color: boja.meki, marginBottom: 4 }}>Mesec</label>
-            <select style={{ ...stilInput, width: '100%' }} value={mesec} onChange={(e) => setMesec(Number(e.target.value))}>
-              {meseci.map((m) => (
-                <option key={m} value={m}>{MESECI[m]} {m >= 9 ? pocetnaGodina : pocetnaGodina + 1}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <button onClick={generisi} disabled={radi} style={{ background: boja.akcenat, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 15, fontWeight: 600, cursor: radi ? 'default' : 'pointer', opacity: radi ? 0.6 : 1 }}>
-          {radi ? 'Generišem...' : 'Generiši tekst'}
-        </button>
-
-        {tekst && (
-          <div style={{ marginTop: 14 }}>
-            <textarea
-              value={tekst}
-              onChange={(e) => setTekst(e.target.value)}
-              style={{ ...stilInput, width: '100%', minHeight: 220, fontFamily: 'system-ui, sans-serif', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <button onClick={kopiraj} style={{ background: boja.tekst, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                Kopiraj tekst
-              </button>
-              {kopirano && <span style={{ color: boja.uspeh, fontSize: 14 }}>Kopirano ✓</span>}
+        <div style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Podsetnik za članarinu</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, color: boja.meki }}>Mesec</label>
+              <select style={stilInput} value={mesec} onChange={(e) => setMesec(Number(e.target.value))}>
+                {meseci.map((m) => (
+                  <option key={m} value={m}>{MESECI[m]} {m >= 9 ? pocetnaGodina : pocetnaGodina + 1}</option>
+                ))}
+              </select>
             </div>
-            <p style={{ fontSize: 12, color: boja.meki, marginTop: 8 }}>
-              Tekst možeš izmeniti pre kopiranja. Spisak dužnika je za privatne poruke — ne objavljuj imena u grupi.
-            </p>
+            <button onClick={generisiPodsetnik} style={dugmeMalo}>Generiši</button>
           </div>
-        )}
+
+          {tekstPodsetnik && (
+            <>
+              <div style={{ fontSize: 13, color: boja.meki, marginBottom: 4 }}>Grupna poruka (za Viber grupu):</div>
+              <textarea value={tekstPodsetnik} onChange={(e) => setTekstPodsetnik(e.target.value)} style={{ ...stilInput, minHeight: 130, fontFamily: 'system-ui', resize: 'vertical' }} />
+              <button onClick={() => kopiraj(tekstPodsetnik, 'podsetnik')} style={{ ...dugme, marginTop: 8 }}>{oznaka('podsetnik')}</button>
+
+              <div style={{ fontSize: 13, fontWeight: 600, margin: '16px 0 6px' }}>
+                Dužnici za {MESECI[mesec]} ({duznici.length}) — privatne poruke
+              </div>
+              {duznici.length === 0 ? (
+                <p style={{ fontSize: 13, color: boja.uspeh }}>Nema dužnika za ovaj mesec.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {duznici.map((d, i) => (
+                    <div key={i} style={{ border: `1px solid ${boja.ivica}`, borderRadius: 8, padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{d.naziv}</div>
+                        <div style={{ fontSize: 12, color: boja.meki }}>
+                          duguje {formatRSD(d.preostalo)}{d.telefon ? ` · ${d.telefon}` : ' · nema telefona'}
+                        </div>
+                      </div>
+                      <button onClick={() => kopiraj(porukaDuzniku(d), 'd' + i)} style={dugmeMalo}>{oznaka('d' + i)}</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <p style={{ fontSize: 12, color: boja.meki, marginTop: 12 }}>
+          Napomena: grupna poruka ide u Viber grupu, a privatne poruke dužnicima šalji pojedinačno (da se ne objavljuju imena dužnika javno).
+        </p>
       </div>
     </div>
   )
