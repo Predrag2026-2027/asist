@@ -7,10 +7,11 @@ import TreninziScreen from './features/treninzi/TreninziScreen'
 import StatistikaScreen from './features/statistika/StatistikaScreen'
 import FinansijeScreen from './features/finansije/FinansijeScreen'
 import ObavestenjaScreen from './features/obavestenja/ObavestenjaScreen'
+import DokumentiScreen from './features/dokumenti/DokumentiScreen'
 import UvozScreen from './features/uvoz/UvozScreen'
 import LoginScreen from './features/auth/LoginScreen'
 
-type Tab = 'porodice' | 'clanarine' | 'treninzi' | 'statistika' | 'finansije' | 'obavestenja' | 'uvoz'
+type Tab = 'porodice' | 'clanarine' | 'treninzi' | 'statistika' | 'finansije' | 'obavestenja' | 'dokumenti' | 'uvoz'
 
 function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -80,6 +81,7 @@ function App() {
           {dugme('statistika', 'Statistika')}
           {dugme('finansije', 'Finansije')}
           {dugme('obavestenja', 'Obaveštenja')}
+          {dugme('dokumenti', 'Dokumenti')}
           {dugme('uvoz', 'Uvoz')}
         </div>
         <button
@@ -95,6 +97,7 @@ function App() {
       {tab === 'statistika' && <StatistikaScreen />}
       {tab === 'finansije' && <FinansijeScreen />}
       {tab === 'obavestenja' && <ObavestenjaScreen />}
+      {tab === 'dokumenti' && <DokumentiScreen />}
       {tab === 'uvoz' && <UvozScreen />}
     </div>
   )
