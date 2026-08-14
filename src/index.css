@@ -1,19 +1,10 @@
-﻿:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #1c1c1a;
-  background-color: #faf9f5;
-}
+﻿@import url(''https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap'');
 
-* {
-  box-sizing: border-box;
+:root {
+  font-family: ''Manrope'', system-ui, sans-serif;
+  color: #111827;
+  background-color: #f9fafb;
+  -webkit-font-smoothing: antialiased;
 }
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  color: #1c1c1a;
-  background-color: #faf9f5;
-}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; color: #111827; background-color: #f9fafb; }
