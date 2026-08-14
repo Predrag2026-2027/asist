@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { T, dugme, polje, labela } from '../../lib/tema'
 
 type Grupa = { id: string; naziv: string; tip: string; uzrast_oznaka: string | null }
 type Trener = { id: string; ime: string }
@@ -24,25 +25,14 @@ type Slot = {
   trener_id: string | null
 }
 
-const boja = {
-  tekst: '#1c1c1a',
-  meki: '#6b6a64',
-  ivica: '#e2e0d8',
-  pozadina: '#faf9f5',
-  karta: '#ffffff',
-  akcenat: '#c2410c',
-  greska: '#b91c1c',
-  uspeh: '#15803d',
-}
-
 const PALETA = ['#1D9E75', '#D85A30', '#378ADD', '#7F77DD', '#BA7517', '#D4537E', '#639922', '#0F6E56', '#993C1D', '#185FA5']
 const DANI = ['Pon', 'Uto', 'Sre', 'Čet', 'Pet', 'Sub', 'Ned']
 const DANI_PUN = ['Ponedeljak', 'Utorak', 'Sreda', 'Četvrtak', 'Petak', 'Subota', 'Nedelja']
 const MESECI = ['Januar', 'Februar', 'Mart', 'April', 'Maj', 'Jun', 'Jul', 'Avgust', 'Septembar', 'Oktobar', 'Novembar', 'Decembar']
-const STATUS: Record<string, { l: string; c: string; bg: string }> = {
-  planiran: { l: 'Planiran', c: boja.meki, bg: '#f1efe8' },
-  odrzan: { l: 'Održan', c: boja.uspeh, bg: '#eaf3ea' },
-  otkazan: { l: 'Otkazan', c: boja.greska, bg: '#fbeaea' },
+const STATUS: Record<string, { l: string; fg: string; bg: string }> = {
+  planiran: { l: 'Zakazano', fg: T.boja.ink600, bg: T.boja.fill },
+  odrzan: { l: 'Održan', fg: T.boja.green700, bg: T.boja.greenBg },
+  otkazan: { l: 'Otkazan', fg: T.boja.red, bg: T.boja.redBg },
 }
 
 function fmt(d: Date): string {
@@ -53,17 +43,8 @@ function labelaGrupe(g?: Grupa): string {
   return g.uzrast_oznaka ? `${g.naziv} ${g.uzrast_oznaka}` : g.naziv
 }
 
-const stilInput: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 10px',
-  border: `1px solid ${boja.ivica}`,
-  borderRadius: 8,
-  fontSize: 14,
-  boxSizing: 'border-box',
-  background: '#fff',
-  color: boja.tekst,
-}
-const stilLabela: React.CSSProperties = { display: 'block', fontSize: 12, color: boja.meki, marginBottom: 3 }
+const karta: React.CSSProperties = { background: '#fff', border: `1px solid ${T.boja.edge}`, borderRadius: 16, padding: 14 }
+const pilula = (bg: string, fg: string): React.CSSProperties => ({ fontSize: 11, fontWeight: 800, padding: '4px 11px', borderRadius: 99, background: bg, color: fg })
 
 export default function TreninziScreen() {
   const [sezonaId, setSezonaId] = useState<string | null>(null)
@@ -361,18 +342,9 @@ export default function TreninziScreen() {
     if (sezonaId) await ucitajMesec(sezonaId, mesecDatum)
   }
 
-  const dugmeMalo: React.CSSProperties = {
-    background: 'none',
-    border: `1px solid ${boja.ivica}`,
-    borderRadius: 8,
-    padding: '6px 12px',
-    cursor: 'pointer',
-    fontSize: 13,
-    color: boja.tekst,
-  }
   const trenerSelect = (vrednost: string, promeni: (v: string) => void) => (
     <select
-      style={stilInput}
+      style={polje}
       value={vrednost}
       onChange={async (e) => {
         if (e.target.value === '__novi__') {
@@ -390,92 +362,95 @@ export default function TreninziScreen() {
   )
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', background: boja.pozadina, color: boja.tekst, minHeight: '100vh', padding: 16 }}>
-      <div style={{ maxWidth: 640, margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 12px' }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Kalendar treninga</h1>
-          <button onClick={() => setPrikaziRaspored(!prikaziRaspored)} style={dugmeMalo}>
-            {prikaziRaspored ? 'Zatvori raspored' : 'Raspored'}
-          </button>
+    <div style={{ padding: '20px 24px', maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.01em' }}>Treninzi</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.boja.ink500 }}>Kalendar, prisustvo i raspored.</div>
         </div>
+        <button onClick={() => setPrikaziRaspored(!prikaziRaspored)} style={dugme('outline-black', 'sm')}>
+          {prikaziRaspored ? 'Zatvori raspored' : 'Raspored'}
+        </button>
+      </div>
 
-        {prikaziRaspored && (
-          <div style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Ponavljajući raspored</div>
-            <p style={{ fontSize: 13, color: boja.meki, marginTop: 0 }}>
-              Definiši termine grupa po danima, pa klikni „Generiši" da se treninzi automatski upišu za prikazani mesec.
-            </p>
+      {prikaziRaspored && (
+        <div style={{ ...karta, marginBottom: 14 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Ponavljajući raspored</div>
+          <p style={{ fontSize: 13, fontWeight: 600, color: T.boja.ink500, marginTop: 0 }}>
+            Definiši termine grupa po danima, pa klikni „Generiši" da se treninzi automatski upišu za prikazani mesec.
+          </p>
 
-            {raspored.length === 0 ? (
-              <p style={{ fontSize: 13, color: boja.meki }}>Još nema definisanih termina.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                {raspored.map((s) => (
-                  <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, borderLeft: `3px solid ${grupaBoja(s.grupa_id)}`, background: boja.pozadina, borderRadius: '0 8px 8px 0', padding: '6px 10px' }}>
-                    <div>
-                      <b>{labelaGrupe(grupaMap.get(s.grupa_id))}</b> · {DANI_PUN[s.dan_u_nedelji - 1]} {s.vreme ? s.vreme.slice(0, 5) : ''}
-                      {s.mesto ? ` · ${s.mesto}` : ''}{s.trener_id ? ` · ${trenerMap.get(s.trener_id)}` : ''}
-                    </div>
-                    <button onClick={() => obrisiSlot(s.id)} style={{ border: 'none', background: 'none', color: boja.greska, cursor: 'pointer', fontSize: 16 }}>×</button>
+          {raspored.length === 0 ? (
+            <p style={{ fontSize: 13, fontWeight: 600, color: T.boja.ink500 }}>Još nema definisanih termina.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+              {raspored.map((s) => (
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, fontWeight: 600, borderLeft: `3px solid ${grupaBoja(s.grupa_id)}`, background: T.boja.bg, borderRadius: '0 10px 10px 0', padding: '8px 12px' }}>
+                  <div>
+                    <b>{labelaGrupe(grupaMap.get(s.grupa_id))}</b> · {DANI_PUN[s.dan_u_nedelji - 1]} {s.vreme ? s.vreme.slice(0, 5) : ''}
+                    {s.mesto ? ` · ${s.mesto}` : ''}{s.trener_id ? ` · ${trenerMap.get(s.trener_id)}` : ''}
                   </div>
-                ))}
-              </div>
-            )}
+                  <button onClick={() => obrisiSlot(s.id)} style={{ border: 'none', background: 'none', color: T.boja.red, cursor: 'pointer', fontSize: 16 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
 
-            <div style={{ borderTop: `1px solid ${boja.ivica}`, paddingTop: 10 }}>
-              <div style={{ marginBottom: 8 }}>
-                <label style={stilLabela}>Grupa</label>
-                <select style={stilInput} value={rGrupa} onChange={(e) => setRGrupa(e.target.value)}>
-                  <option value="">— izaberi —</option>
-                  {grupe.map((g) => (
-                    <option key={g.id} value={g.id}>{labelaGrupe(g)}</option>
+          <div style={{ borderTop: `1px solid ${T.boja.edge}`, paddingTop: 12 }}>
+            <div style={{ marginBottom: 8 }}>
+              <label style={labela}>Grupa</label>
+              <select style={polje} value={rGrupa} onChange={(e) => setRGrupa(e.target.value)}>
+                <option value="">— izaberi —</option>
+                {grupe.map((g) => (
+                  <option key={g.id} value={g.id}>{labelaGrupe(g)}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labela}>Dan</label>
+                <select style={polje} value={rDan} onChange={(e) => setRDan(Number(e.target.value))}>
+                  {DANI_PUN.map((d, i) => (
+                    <option key={i} value={i + 1}>{d}</option>
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={stilLabela}>Dan</label>
-                  <select style={stilInput} value={rDan} onChange={(e) => setRDan(Number(e.target.value))}>
-                    {DANI_PUN.map((d, i) => (
-                      <option key={i} value={i + 1}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={stilLabela}>Vreme</label>
-                  <input type="time" style={stilInput} value={rVreme} onChange={(e) => setRVreme(e.target.value)} />
-                </div>
-              </div>
-              <div style={{ marginBottom: 8 }}>
-                <label style={stilLabela}>Mesto / hala</label>
-                <input style={stilInput} value={rMesto} onChange={(e) => setRMesto(e.target.value)} />
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <label style={stilLabela}>Trener</label>
-                {trenerSelect(rTrener, setRTrener)}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={dodajSlot} style={dugmeMalo}>+ Dodaj termin u raspored</button>
-                <button onClick={generisi} disabled={radi} style={{ ...dugmeMalo, background: boja.akcenat, color: '#fff', border: 'none', fontWeight: 600, marginLeft: 'auto' }}>
-                  {radi ? 'Generišem...' : `Generiši za ${MESECI[mesecDatum.getMonth()]}`}
-                </button>
+              <div style={{ flex: 1 }}>
+                <label style={labela}>Vreme</label>
+                <input type="time" style={polje} value={rVreme} onChange={(e) => setRVreme(e.target.value)} />
               </div>
             </div>
+            <div style={{ marginBottom: 8 }}>
+              <label style={labela}>Mesto / hala</label>
+              <input style={polje} value={rMesto} onChange={(e) => setRMesto(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={labela}>Trener</label>
+              {trenerSelect(rTrener, setRTrener)}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={dodajSlot} style={dugme('outline-black', 'sm')}>+ Dodaj termin</button>
+              <button onClick={generisi} disabled={radi} style={{ ...dugme('brand', 'sm'), marginLeft: 'auto' }}>
+                {radi ? 'Generišem...' : `Generiši za ${MESECI[mesecDatum.getMonth()]}`}
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <button onClick={() => pomeriMesec(-1)} style={dugmeMalo}>‹</button>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>{MESECI[mesecDatum.getMonth()]} {mesecDatum.getFullYear()}</div>
-          <button onClick={() => pomeriMesec(1)} style={dugmeMalo}>›</button>
+      <div style={{ ...karta, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <button onClick={() => pomeriMesec(-1)} style={dugme('ghost-black', 'sm')}>‹</button>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>{MESECI[mesecDatum.getMonth()]} {mesecDatum.getFullYear()}</div>
+          <button onClick={() => pomeriMesec(1)} style={dugme('ghost-black', 'sm')}>›</button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, fontSize: 11, color: boja.meki, textAlign: 'center', marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, fontSize: 11, fontWeight: 700, color: T.boja.ink500, textAlign: 'center', marginBottom: 6 }}>
           {DANI.map((d) => (
             <div key={d}>{d}</div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
           {celije.map((dan, i) => {
             if (!dan) return <div key={i} />
             const t = poDanu.get(dan) ?? []
@@ -490,136 +465,145 @@ export default function TreninziScreen() {
                   setOtvoreniId(null)
                 }}
                 style={{
-                  minHeight: 42,
-                  border: `1px solid ${izabran ? boja.akcenat : boja.ivica}`,
-                  background: izabran ? '#fbeee8' : boja.karta,
-                  borderRadius: 8,
-                  padding: '3px 0 2px',
+                  minHeight: 46,
+                  border: `1px solid ${izabran || danas ? T.boja.brand : T.boja.edge}`,
+                  background: izabran ? T.boja.pill : '#fff',
+                  borderRadius: 10,
+                  padding: '5px 0 3px',
                   cursor: 'pointer',
-                  color: boja.tekst,
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: danas ? 700 : 400, color: danas ? boja.akcenat : boja.tekst }}>{Number(dan.slice(8, 10))}</div>
-                <div style={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', minHeight: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: danas ? 800 : 600, color: danas ? T.boja.brand : T.boja.ink }}>{Number(dan.slice(8, 10))}</div>
+                <div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap', minHeight: 7, marginTop: 2 }}>
                   {t.slice(0, 4).map((x) => (
-                    <span key={x.id} style={{ width: 5, height: 5, borderRadius: '50%', background: grupaBoja(x.grupa_id) }} />
+                    <span key={x.id} style={{ width: 6, height: 6, borderRadius: '50%', background: grupaBoja(x.grupa_id) }} />
                   ))}
                 </div>
               </button>
             )
           })}
         </div>
+      </div>
 
-        {poruka && <p style={{ fontSize: 14, color: poruka.tip === 'greska' ? boja.greska : boja.uspeh, marginTop: 12 }}>{poruka.tekst}</p>}
+      {poruka && <p style={{ fontSize: 14, fontWeight: 700, color: poruka.tip === 'greska' ? T.boja.red : T.boja.green700, marginTop: 0 }}>{poruka.tekst}</p>}
 
-        {izabraniDan && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>Termini · {izabraniDan.split('-').reverse().join('.')}.</div>
-              {!prikaziFormu && <button onClick={() => setPrikaziFormu(true)} style={dugmeMalo}>+ Novi trening</button>}
-            </div>
+      {izabraniDan && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 800 }}>Termini · {izabraniDan.split('-').reverse().join('.')}.</div>
+            {!prikaziFormu && <button onClick={() => setPrikaziFormu(true)} style={dugme('brand', 'sm')}>+ Novi trening</button>}
+          </div>
 
-            {preklapanja.size > 0 && (
-              <p style={{ fontSize: 13, color: boja.akcenat, marginTop: 0 }}>⚠ Preklapanje: dva termina u istoj hali u isto vreme.</p>
-            )}
+          {preklapanja.size > 0 && (
+            <p style={{ fontSize: 13, fontWeight: 700, color: T.boja.brand, marginTop: 0 }}>⚠ Preklapanje: dva termina u istoj hali u isto vreme.</p>
+          )}
 
-            {prikaziFormu && (
-              <div style={{ background: boja.karta, border: `1px solid ${boja.akcenat}`, borderRadius: 12, padding: 12, marginBottom: 10 }}>
-                <div style={{ marginBottom: 8 }}>
-                  <label style={stilLabela}>Grupa *</label>
-                  <select style={stilInput} value={novaGrupa} onChange={(e) => setNovaGrupa(e.target.value)}>
-                    <option value="">— izaberi grupu —</option>
-                    {grupe.map((g) => (
-                      <option key={g.id} value={g.id}>{labelaGrupe(g)}</option>
-                    ))}
-                  </select>
+          {prikaziFormu && (
+            <div style={{ ...karta, borderColor: T.boja.brand, marginBottom: 10 }}>
+              <div style={{ marginBottom: 8 }}>
+                <label style={labela}>Grupa *</label>
+                <select style={polje} value={novaGrupa} onChange={(e) => setNovaGrupa(e.target.value)}>
+                  <option value="">— izaberi grupu —</option>
+                  {grupe.map((g) => (
+                    <option key={g.id} value={g.id}>{labelaGrupe(g)}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labela}>Vreme</label>
+                  <input type="time" style={polje} value={novoVreme} onChange={(e) => setNovoVreme(e.target.value)} />
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={stilLabela}>Vreme</label>
-                    <input type="time" style={stilInput} value={novoVreme} onChange={(e) => setNovoVreme(e.target.value)} />
-                  </div>
-                  <div style={{ flex: 2 }}>
-                    <label style={stilLabela}>Mesto / hala</label>
-                    <input style={stilInput} value={novoMesto} onChange={(e) => setNovoMesto(e.target.value)} />
-                  </div>
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label style={stilLabela}>Trener</label>
-                  {trenerSelect(noviTrener, setNoviTrener)}
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={sacuvajNovi} disabled={radi} style={{ ...dugmeMalo, background: boja.akcenat, color: '#fff', border: 'none', fontWeight: 600, flex: 1 }}>
-                    {radi ? 'Čuvam...' : 'Dodaj trening'}
-                  </button>
-                  <button onClick={() => setPrikaziFormu(false)} style={dugmeMalo}>Otkaži</button>
+                <div style={{ flex: 2 }}>
+                  <label style={labela}>Mesto / hala</label>
+                  <input style={polje} value={novoMesto} onChange={(e) => setNovoMesto(e.target.value)} />
                 </div>
               </div>
-            )}
+              <div style={{ marginBottom: 12 }}>
+                <label style={labela}>Trener</label>
+                {trenerSelect(noviTrener, setNoviTrener)}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={sacuvajNovi} disabled={radi} style={{ ...dugme('brand', 'md'), flex: 1 }}>
+                  {radi ? 'Čuvam...' : 'Dodaj trening'}
+                </button>
+                <button onClick={() => setPrikaziFormu(false)} style={dugme('ghost-black', 'md')}>Otkaži</button>
+              </div>
+            </div>
+          )}
 
-            {terminiDana.length === 0 && !prikaziFormu ? (
-              <p style={{ color: boja.meki, fontSize: 14 }}>Nema termina za ovaj dan.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {terminiDana.map((t) => {
-                  const g = grupaMap.get(t.grupa_id)
-                  const st = STATUS[t.status] ?? STATUS.planiran
-                  const otvoren = otvoreniId === t.id
-                  const sukob = preklapanja.has(t.id)
-                  return (
-                    <div key={t.id} style={{ background: boja.karta, border: `1px solid ${sukob ? boja.akcenat : boja.ivica}`, borderLeft: `3px solid ${grupaBoja(t.grupa_id)}`, borderRadius: 10, padding: '10px 12px' }}>
-                      <div onClick={() => otvori(t)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', gap: 8 }}>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>{t.vreme ? t.vreme.slice(0, 5) + ' · ' : ''}{labelaGrupe(g)}</div>
-                          <div style={{ fontSize: 12, color: boja.meki }}>
+          {terminiDana.length === 0 && !prikaziFormu ? (
+            <p style={{ color: T.boja.ink500, fontSize: 14, fontWeight: 600 }}>Nema termina za ovaj dan.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {terminiDana.map((t) => {
+                const g = grupaMap.get(t.grupa_id)
+                const st = STATUS[t.status] ?? STATUS.planiran
+                const otvoren = otvoreniId === t.id
+                const sukob = preklapanja.has(t.id)
+                return (
+                  <div key={t.id} style={{ background: '#fff', border: `1px solid ${sukob ? T.boja.brand : T.boja.edge}`, borderLeft: `3px solid ${grupaBoja(t.grupa_id)}`, borderRadius: 14, padding: 14 }}>
+                    <div onClick={() => otvori(t)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                        <div style={{ width: 62, flex: '0 0 62px', padding: '8px 0', borderRadius: 11, background: T.boja.fill, textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 800 }}>{t.vreme ? t.vreme.slice(0, 5) : '--:--'}</div>
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 800 }}>{labelaGrupe(g)}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: T.boja.ink500 }}>
                             {[t.mesto, t.trener_id ? trenerMap.get(t.trener_id) : null].filter(Boolean).join(' · ') || 'bez detalja'}
                           </div>
                         </div>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: st.c, background: st.bg, padding: '2px 8px', borderRadius: 20 }}>{st.l}</span>
                       </div>
+                      <span style={pilula(st.bg, st.fg)}>{st.l}</span>
+                    </div>
 
-                      {otvoren && (
-                        <div style={{ marginTop: 10, borderTop: `1px solid ${boja.ivica}`, paddingTop: 10 }}>
-                          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                            <div style={{ flex: 1 }}>
-                              <label style={stilLabela}>Vreme</label>
-                              <input type="time" style={stilInput} value={edit.vreme} onChange={(e) => setEdit({ ...edit, vreme: e.target.value })} />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <label style={stilLabela}>Status</label>
-                              <select style={stilInput} value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
-                                <option value="planiran">Planiran</option>
-                                <option value="odrzan">Održan</option>
-                                <option value="otkazan">Otkazan</option>
-                              </select>
-                            </div>
+                    {otvoren && (
+                      <div style={{ marginTop: 12, borderTop: `1px solid ${T.boja.edge}`, paddingTop: 12 }}>
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={labela}>Vreme</label>
+                            <input type="time" style={polje} value={edit.vreme} onChange={(e) => setEdit({ ...edit, vreme: e.target.value })} />
                           </div>
-                          <div style={{ marginBottom: 8 }}>
-                            <label style={stilLabela}>Mesto / hala</label>
-                            <input style={stilInput} value={edit.mesto} onChange={(e) => setEdit({ ...edit, mesto: e.target.value })} />
+                          <div style={{ flex: 1 }}>
+                            <label style={labela}>Status</label>
+                            <select style={polje} value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
+                              <option value="planiran">Zakazano</option>
+                              <option value="odrzan">Održan</option>
+                              <option value="otkazan">Otkazan</option>
+                            </select>
                           </div>
-                          <div style={{ marginBottom: 8 }}>
-                            <label style={stilLabela}>Trener</label>
-                            {trenerSelect(edit.trener_id, (v) => setEdit({ ...edit, trener_id: v }))}
-                          </div>
-                          <div style={{ marginBottom: 8 }}>
-                            <label style={stilLabela}>Plan i program</label>
-                            <textarea style={{ ...stilInput, minHeight: 54, resize: 'vertical' }} value={edit.plan} onChange={(e) => setEdit({ ...edit, plan: e.target.value })} />
-                          </div>
-                          <div style={{ marginBottom: 12 }}>
-                            <label style={stilLabela}>Napomena / komentar</label>
-                            <input style={stilInput} value={edit.napomena} onChange={(e) => setEdit({ ...edit, napomena: e.target.value })} />
-                          </div>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={labela}>Mesto / hala</label>
+                          <input style={polje} value={edit.mesto} onChange={(e) => setEdit({ ...edit, mesto: e.target.value })} />
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={labela}>Trener</label>
+                          {trenerSelect(edit.trener_id, (v) => setEdit({ ...edit, trener_id: v }))}
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={labela}>Plan i program</label>
+                          <textarea style={{ ...polje, height: 'auto', minHeight: 56, padding: '10px 14px', resize: 'vertical' }} value={edit.plan} onChange={(e) => setEdit({ ...edit, plan: e.target.value })} />
+                        </div>
+                        <div style={{ marginBottom: 14 }}>
+                          <label style={labela}>Napomena / komentar</label>
+                          <input style={polje} value={edit.napomena} onChange={(e) => setEdit({ ...edit, napomena: e.target.value })} />
+                        </div>
 
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600 }}>Prisustvo: {prisutni.size} / {deca.length}</div>
+                        <div style={{ background: T.boja.ink, borderRadius: 14, padding: '12px 14px', marginBottom: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.boja.brandOnDark }}>Prisustvo</div>
+                              <div style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{prisutni.size} <span style={{ color: T.boja.ink400, fontSize: 15 }}>/ {deca.length}</span></div>
+                            </div>
                             <div style={{ display: 'flex', gap: 6 }}>
-                              <button onClick={() => setPrisutni(new Set(deca.map((d) => d.id)))} style={dugmeMalo}>Svi</button>
-                              <button onClick={() => setPrisutni(new Set())} style={dugmeMalo}>Niko</button>
+                              <button onClick={() => setPrisutni(new Set(deca.map((d) => d.id)))} style={{ ...dugme('outline-black', 'sm'), background: 'transparent', color: '#fff', borderColor: T.boja.ink700 }}>Svi</button>
+                              <button onClick={() => setPrisutni(new Set())} style={{ ...dugme('ghost-black', 'sm'), color: T.boja.ink400 }}>Očisti</button>
                             </div>
                           </div>
                           {deca.length === 0 ? (
-                            <p style={{ fontSize: 13, color: boja.meki }}>Grupa nema aktivnih članova.</p>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: T.boja.ink400, margin: 0 }}>Grupa nema aktivnih članova.</p>
                           ) : (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                               {deca.map((d) => {
@@ -633,7 +617,16 @@ export default function TreninziScreen() {
                                       else s.add(d.id)
                                       setPrisutni(s)
                                     }}
-                                    style={{ fontSize: 13, padding: '6px 10px', borderRadius: 16, cursor: 'pointer', border: `1px solid ${p ? boja.uspeh : boja.ivica}`, background: p ? '#eaf3ea' : boja.karta, color: p ? boja.uspeh : boja.meki }}
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: 700,
+                                      padding: '7px 12px',
+                                      borderRadius: 10,
+                                      cursor: 'pointer',
+                                      border: `1px solid ${p ? T.boja.green : T.boja.ink700}`,
+                                      background: p ? T.boja.green : 'transparent',
+                                      color: p ? '#fff' : T.boja.ink400,
+                                    }}
                                   >
                                     {p ? '✓ ' : ''}{d.ime}
                                   </button>
@@ -641,25 +634,25 @@ export default function TreninziScreen() {
                               })}
                             </div>
                           )}
-
-                          <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-                            <button onClick={() => sacuvajDetalj(t)} disabled={radi} style={{ ...dugmeMalo, background: boja.akcenat, color: '#fff', border: 'none', fontWeight: 600, flex: 1 }}>
-                              {radi ? 'Čuvam...' : 'Sačuvaj'}
-                            </button>
-                            <button onClick={() => obrisi(t)} style={{ ...dugmeMalo, color: boja.greska }}>Obriši</button>
-                          </div>
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
 
-        {!izabraniDan && <p style={{ color: boja.meki, fontSize: 14, marginTop: 16 }}>Izaberi dan u kalendaru da vidiš ili dodaš treninge.</p>}
-      </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => sacuvajDetalj(t)} disabled={radi} style={{ ...dugme('default-purple', 'md'), flex: 1 }}>
+                            {radi ? 'Čuvam...' : 'Sačuvaj prisustvo'}
+                          </button>
+                          <button onClick={() => obrisi(t)} style={dugme('outline-danger', 'md')}>Obriši</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!izabraniDan && <p style={{ color: T.boja.ink500, fontSize: 14, fontWeight: 600 }}>Izaberi dan u kalendaru da vidiš ili dodaš treninge.</p>}
     </div>
   )
 }
