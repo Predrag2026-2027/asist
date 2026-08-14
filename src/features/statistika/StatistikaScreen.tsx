@@ -1,42 +1,17 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
+import { T, dugme, pragBoja } from '../../lib/tema'
 
 type Grupa = { id: string; naziv: string; tip: string; uzrast_oznaka: string | null }
 type Red = { ime: string; prisutan: number; odrzano: number; pct: number }
-
-const boja = {
-  tekst: '#1c1c1a',
-  meki: '#6b6a64',
-  ivica: '#e2e0d8',
-  pozadina: '#faf9f5',
-  karta: '#ffffff',
-  akcenat: '#c2410c',
-  greska: '#b91c1c',
-  uspeh: '#15803d',
-}
 
 function labelaGrupe(g?: Grupa): string {
   if (!g) return ''
   return g.uzrast_oznaka ? `${g.naziv} ${g.uzrast_oznaka}` : g.naziv
 }
 
-function bojaPct(p: number): string {
-  if (p >= 75) return boja.uspeh
-  if (p >= 50) return '#BA7517'
-  return boja.greska
-}
-
-const stilInput: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 10px',
-  border: `1px solid ${boja.ivica}`,
-  borderRadius: 8,
-  fontSize: 14,
-  boxSizing: 'border-box',
-  background: '#fff',
-  color: boja.tekst,
-}
+const karta: React.CSSProperties = { background: '#fff', border: `1px solid ${T.boja.edge}`, borderRadius: 16, padding: '14px 16px' }
 
 export default function StatistikaScreen() {
   const [sezonaId, setSezonaId] = useState<string | null>(null)
@@ -67,20 +42,11 @@ export default function StatistikaScreen() {
   async function izracunaj() {
     setUcitava(true)
     const { data: held } = await supabase
-      .from('treninzi')
-      .select('id')
-      .eq('sezona_id', sezonaId)
-      .eq('grupa_id', grupaId)
-      .eq('status', 'odrzan')
+      .from('treninzi').select('id').eq('sezona_id', sezonaId).eq('grupa_id', grupaId).eq('status', 'odrzan')
     const heldIds = ((held as any[]) ?? []).map((t) => t.id)
     setOdrzano(heldIds.length)
 
-    const { data: cl } = await supabase
-      .from('clanstvo')
-      .select('clan_id')
-      .eq('grupa_id', grupaId)
-      .eq('sezona_id', sezonaId)
-      .is('datum_do', null)
+    const { data: cl } = await supabase.from('clanstvo').select('clan_id').eq('grupa_id', grupaId).eq('sezona_id', sezonaId).is('datum_do', null)
     const childIds = [...new Set(((cl as any[]) ?? []).map((x) => x.clan_id))]
 
     let clanovi: { id: string; ime: string }[] = []
@@ -91,12 +57,7 @@ export default function StatistikaScreen() {
 
     const brojPrisutnih: Record<string, number> = {}
     if (heldIds.length) {
-      const { data: pr } = await supabase
-        .from('prisustvo')
-        .select('clan_id')
-        .in('trening_id', heldIds)
-        .eq('prisutan', true)
-        .range(0, 9999)
+      const { data: pr } = await supabase.from('prisustvo').select('clan_id').in('trening_id', heldIds).eq('prisutan', true).range(0, 9999)
       for (const r of (pr as any[]) ?? []) brojPrisutnih[r.clan_id] = (brojPrisutnih[r.clan_id] ?? 0) + 1
     }
 
@@ -114,12 +75,7 @@ export default function StatistikaScreen() {
 
   function izvezi() {
     const g = grupe.find((x) => x.id === grupaId)
-    const podaci = redovi.map((r) => ({
-      Dete: r.ime,
-      Prisutan: r.prisutan,
-      Održano: r.odrzano,
-      'Procenat (%)': r.pct,
-    }))
+    const podaci = redovi.map((r) => ({ Dete: r.ime, Prisutan: r.prisutan, 'Održano': r.odrzano, 'Procenat (%)': r.pct }))
     const ws = XLSX.utils.json_to_sheet(podaci)
     ws['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 14 }]
     const wb = XLSX.utils.book_new()
@@ -128,58 +84,58 @@ export default function StatistikaScreen() {
   }
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', background: boja.pozadina, color: boja.tekst, minHeight: '100vh', padding: 16 }}>
-      <div style={{ maxWidth: 640, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, margin: '8px 0 2px' }}>Statistika prisustva</h1>
-        <p style={{ color: boja.meki, marginTop: 0, fontSize: 14 }}>Na osnovu održanih treninga · sezona 2026/2027</p>
+    <div style={{ padding: '20px 24px', maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.01em' }}>Statistika prisustva</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.boja.ink500 }}>Na osnovu održanih treninga · sezona 2026/2027</div>
+      </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', margin: '12px 0' }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <label style={{ display: 'block', fontSize: 13, color: boja.meki, marginBottom: 4 }}>Grupa</label>
-            <select style={stilInput} value={grupaId} onChange={(e) => setGrupaId(e.target.value)}>
-              {grupe.map((g) => (
-                <option key={g.id} value={g.id}>{labelaGrupe(g)}</option>
-              ))}
-            </select>
-          </div>
-          <button onClick={izvezi} style={{ ...stilInput, width: 'auto', cursor: 'pointer', fontWeight: 500 }}>Izvezi u Excel</button>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        {grupe.map((g) => {
+          const a = g.id === grupaId
+          return (
+            <button key={g.id} onClick={() => setGrupaId(g.id)} style={{ fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${a ? T.boja.ink : T.boja.edge}`, background: a ? T.boja.ink : '#fff', color: a ? '#fff' : T.boja.ink600 }}>
+              {labelaGrupe(g)}
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ ...karta, flex: 1, minWidth: 150 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.boja.ink500 }}>Održanih treninga</div>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', marginTop: 2 }}>{odrzano}</div>
         </div>
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <div style={{ flex: 1, background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 10, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, color: boja.meki }}>Održanih treninga</div>
-            <div style={{ fontSize: 20, fontWeight: 600 }}>{odrzano}</div>
-          </div>
-          <div style={{ flex: 1, background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 10, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, color: boja.meki }}>Prosečna posećenost</div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: bojaPct(prosek) }}>{prosek}%</div>
-          </div>
+        <div style={{ ...karta, flex: 1, minWidth: 150 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.boja.ink500 }}>Prosečna posećenost</div>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', marginTop: 2, color: pragBoja(prosek) }}>{prosek}%</div>
         </div>
+        <button onClick={izvezi} style={{ ...dugme('outline-black', 'md'), alignSelf: 'flex-end' }}>Izvezi u Excel</button>
+      </div>
 
-        {ucitava ? (
-          <p style={{ color: boja.meki, fontSize: 14 }}>Računam...</p>
-        ) : odrzano === 0 ? (
-          <p style={{ color: boja.meki, fontSize: 14 }}>Za ovu grupu još nema treninga označenih kao „održan". Označi treninge na kalendaru da bi statistika imala osnovu.</p>
-        ) : redovi.length === 0 ? (
-          <p style={{ color: boja.meki, fontSize: 14 }}>Grupa nema aktivnih članova.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {redovi.map((r, i) => (
-              <div key={i} style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 10, padding: '10px 12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ fontWeight: 600 }}>{r.ime}</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: bojaPct(r.pct) }}>
-                    {r.pct}% <span style={{ color: boja.meki, fontWeight: 400, fontSize: 13 }}>({r.prisutan}/{r.odrzano})</span>
-                  </div>
-                </div>
-                <div style={{ height: 6, background: boja.pozadina, borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ width: `${r.pct}%`, height: '100%', background: bojaPct(r.pct) }} />
+      {ucitava ? (
+        <p style={{ color: T.boja.ink500, fontSize: 14, fontWeight: 600 }}>Računam...</p>
+      ) : odrzano === 0 ? (
+        <p style={{ color: T.boja.ink500, fontSize: 14, fontWeight: 600 }}>Za ovu grupu još nema treninga označenih kao „održan". Označi treninge na kalendaru da bi statistika imala osnovu.</p>
+      ) : redovi.length === 0 ? (
+        <p style={{ color: T.boja.ink500, fontSize: 14, fontWeight: 600 }}>Grupa nema aktivnih članova.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {redovi.map((r, i) => (
+            <div key={i} style={{ ...karta, padding: '12px 14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{r.ime}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: pragBoja(r.pct) }}>
+                  {r.pct}% <span style={{ color: T.boja.ink500, fontWeight: 600 }}>({r.prisutan}/{r.odrzano})</span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div style={{ height: 8, background: T.boja.fill, borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ width: `${r.pct}%`, height: '100%', background: pragBoja(r.pct) }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
