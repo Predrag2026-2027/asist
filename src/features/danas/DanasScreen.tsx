@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { T, dugme, pragBoja } from '../../lib/tema'
+import { T, dugme } from '../../lib/tema'
 
 type Props = { onNavigate: (t: string) => void }
 type Trening = { id: string; vreme: string | null; mesto: string | null; status: string; naziv: string; prisutno: number; ukupno: number }
