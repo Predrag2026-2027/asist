@@ -1,26 +1,8 @@
 ﻿import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { T, dugme, polje, labela } from '../../lib/tema'
 
-type Dokument = {
-  id: string
-  naziv: string
-  kategorija: string | null
-  putanja: string
-  velicina: number | null
-  tip_fajla: string | null
-  created_at: string
-}
-
-const boja = {
-  tekst: '#1c1c1a',
-  meki: '#6b6a64',
-  ivica: '#e2e0d8',
-  pozadina: '#faf9f5',
-  karta: '#ffffff',
-  akcenat: '#c2410c',
-  greska: '#b91c1c',
-  uspeh: '#15803d',
-}
+type Dokument = { id: string; naziv: string; kategorija: string | null; putanja: string; velicina: number | null; tip_fajla: string | null; created_at: string }
 
 const KATEGORIJE = ['Zapisnik', 'Ugovor', 'Odluka', 'Finansijski dokument', 'Dopis', 'Ostalo']
 
@@ -35,17 +17,7 @@ function formatDatum(d: string): string {
   return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}.${dt.getFullYear()}.`
 }
 
-const stilInput: React.CSSProperties = {
-  width: '100%',
-  padding: '8px 10px',
-  border: `1px solid ${boja.ivica}`,
-  borderRadius: 8,
-  fontSize: 14,
-  boxSizing: 'border-box',
-  background: '#fff',
-  color: boja.tekst,
-}
-const stilLabela: React.CSSProperties = { display: 'block', fontSize: 12, color: boja.meki, marginBottom: 3 }
+const karta: React.CSSProperties = { background: '#fff', border: `1px solid ${T.boja.edge}`, borderRadius: 16, padding: 16 }
 
 export default function DokumentiScreen() {
   const [sezonaId, setSezonaId] = useState<string | null>(null)
@@ -66,9 +38,7 @@ export default function DokumentiScreen() {
     const { data } = await supabase.from('dokumenti').select('*').order('created_at', { ascending: false })
     setDokumenti((data as any) ?? [])
   }
-  useEffect(() => {
-    ucitajOsnovu()
-  }, [])
+  useEffect(() => { ucitajOsnovu() }, [])
 
   function izaberiFajl(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null
@@ -78,43 +48,24 @@ export default function DokumentiScreen() {
 
   async function otpremi() {
     setPoruka(null)
-    if (!fajl) {
-      setPoruka({ tip: 'greska', tekst: 'Izaberi fajl.' })
-      return
-    }
+    if (!fajl) { setPoruka({ tip: 'greska', tekst: 'Izaberi fajl.' }); return }
     setRadi(true)
     try {
       const cist = fajl.name.replace(/[^\w.\-]+/g, '_')
       const putanja = `${crypto.randomUUID()}-${cist}`
       const { error: e1 } = await supabase.storage.from('dokumenti').upload(putanja, fajl)
       if (e1) throw e1
-      const { error: e2 } = await supabase.from('dokumenti').insert({
-        sezona_id: sezonaId,
-        naziv: naziv.trim() || fajl.name,
-        kategorija: kategorija || null,
-        putanja,
-        velicina: fajl.size,
-        tip_fajla: fajl.type || null,
-      })
+      const { error: e2 } = await supabase.from('dokumenti').insert({ sezona_id: sezonaId, naziv: naziv.trim() || fajl.name, kategorija: kategorija || null, putanja, velicina: fajl.size, tip_fajla: fajl.type || null })
       if (e2) throw e2
-      setFajl(null)
-      setNaziv('')
-      setKategorija('')
+      setFajl(null); setNaziv(''); setKategorija('')
       setPoruka({ tip: 'uspeh', tekst: 'Dokument je otpremljen.' })
       await ucitaj()
-    } catch (err: any) {
-      setPoruka({ tip: 'greska', tekst: 'Greška: ' + (err.message ?? String(err)) })
-    } finally {
-      setRadi(false)
-    }
+    } catch (err: any) { setPoruka({ tip: 'greska', tekst: 'Greška: ' + (err.message ?? String(err)) }) } finally { setRadi(false) }
   }
 
   async function preuzmi(d: Dokument) {
     const { data, error } = await supabase.storage.from('dokumenti').createSignedUrl(d.putanja, 120)
-    if (error || !data?.signedUrl) {
-      setPoruka({ tip: 'greska', tekst: 'Ne mogu da otvorim fajl.' })
-      return
-    }
+    if (error || !data?.signedUrl) { setPoruka({ tip: 'greska', tekst: 'Ne mogu da otvorim fajl.' }); return }
     window.open(data.signedUrl, '_blank')
   }
 
@@ -127,76 +78,73 @@ export default function DokumentiScreen() {
 
   const prikazani = filter === 'Sve' ? dokumenti : dokumenti.filter((d) => (d.kategorija || 'Ostalo') === filter)
 
-  const dugmeMalo: React.CSSProperties = {
-    background: 'none',
-    border: `1px solid ${boja.ivica}`,
-    borderRadius: 8,
-    padding: '6px 12px',
-    cursor: 'pointer',
-    fontSize: 13,
-    color: boja.tekst,
-  }
-
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', background: boja.pozadina, color: boja.tekst, minHeight: '100vh', padding: 16 }}>
-      <div style={{ maxWidth: 640, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, margin: '8px 0 2px' }}>Dokumentacija i zapisnici</h1>
-        <p style={{ color: boja.meki, marginTop: 0, fontSize: 14 }}>Fajlovi su dostupni samo prijavljenim korisnicima.</p>
+    <div style={{ padding: '20px 24px', maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.01em' }}>Dokumentacija i zapisnici</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.boja.ink500 }}>Fajlovi su dostupni samo prijavljenim korisnicima.</div>
+      </div>
 
-        <div style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Novi dokument</div>
-          <div style={{ marginBottom: 8 }}>
-            <label style={stilLabela}>Fajl</label>
-            <input type="file" onChange={izaberiFajl} style={{ fontSize: 14 }} />
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-            <div style={{ flex: 2, minWidth: 160 }}>
-              <label style={stilLabela}>Naziv</label>
-              <input style={stilInput} value={naziv} onChange={(e) => setNaziv(e.target.value)} placeholder="npr. Zapisnik sa sednice 12.09" />
-            </div>
-            <div style={{ flex: 1, minWidth: 140 }}>
-              <label style={stilLabela}>Kategorija</label>
-              <select style={stilInput} value={kategorija} onChange={(e) => setKategorija(e.target.value)}>
-                <option value="">— izaberi —</option>
-                {KATEGORIJE.map((k) => (<option key={k} value={k}>{k}</option>))}
-              </select>
-            </div>
-          </div>
-          <button onClick={otpremi} disabled={radi} style={{ width: '100%', background: boja.akcenat, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 15, fontWeight: 600, cursor: radi ? 'default' : 'pointer', opacity: radi ? 0.6 : 1 }}>
-            {radi ? 'Otpremam...' : 'Otpremi dokument'}
-          </button>
-          {poruka && (<p style={{ fontSize: 14, color: poruka.tip === 'greska' ? boja.greska : boja.uspeh, marginBottom: 0 }}>{poruka.tekst}</p>)}
+      <div style={{ ...karta, marginBottom: 18 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Novi dokument</div>
+        <div style={{ marginBottom: 8 }}>
+          <label style={labela}>Fajl</label>
+          <input type="file" onChange={izaberiFajl} style={{ fontSize: 14, fontFamily: 'inherit' }} />
         </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0 8px', gap: 8, flexWrap: 'wrap' }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Dokumenti ({prikazani.length})</h2>
-          <select style={{ ...stilInput, width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="Sve">Sve kategorije</option>
-            {KATEGORIJE.map((k) => (<option key={k} value={k}>{k}</option>))}
-          </select>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 2, minWidth: 160 }}>
+            <label style={labela}>Naziv</label>
+            <input style={polje} value={naziv} onChange={(e) => setNaziv(e.target.value)} placeholder="npr. Zapisnik sa sednice 12.09" />
+          </div>
+          <div style={{ flex: 1, minWidth: 140 }}>
+            <label style={labela}>Kategorija</label>
+            <select style={polje} value={kategorija} onChange={(e) => setKategorija(e.target.value)}>
+              <option value="">— izaberi —</option>
+              {KATEGORIJE.map((k) => (<option key={k} value={k}>{k}</option>))}
+            </select>
+          </div>
         </div>
+        <button onClick={otpremi} disabled={radi} style={{ ...dugme('brand', 'md'), width: '100%', opacity: radi ? 0.6 : 1 }}>
+          {radi ? 'Otpremam...' : 'Otpremi dokument'}
+        </button>
+        {poruka && (<p style={{ fontSize: 14, fontWeight: 700, color: poruka.tip === 'greska' ? T.boja.red : T.boja.green700, marginBottom: 0 }}>{poruka.tekst}</p>)}
+      </div>
 
-        {prikazani.length === 0 ? (
-          <p style={{ color: boja.meki, fontSize: 14 }}>Nema dokumenata.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {prikazani.map((d) => (
-              <div key={d.id} style={{ background: boja.karta, border: `1px solid ${boja.ivica}`, borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.naziv}</div>
-                  <div style={{ fontSize: 12, color: boja.meki }}>
-                    {[d.kategorija, formatDatum(d.created_at), formatVel(d.velicina)].filter(Boolean).join(' · ')}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => preuzmi(d)} style={dugmeMalo}>Preuzmi</button>
-                  <button onClick={() => obrisi(d)} style={{ ...dugmeMalo, color: boja.greska }}>×</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 16, fontWeight: 800 }}>Dokumenti ({prikazani.length})</div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        {['Sve', ...KATEGORIJE].map((k) => {
+          const a = filter === k
+          return (
+            <button key={k} onClick={() => setFilter(k)} style={{ fontSize: 13, fontWeight: 700, padding: '6px 13px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${a ? T.boja.ink : T.boja.edge}`, background: a ? T.boja.ink : '#fff', color: a ? '#fff' : T.boja.ink600 }}>
+              {k}
+            </button>
+          )
+        })}
+      </div>
+
+      {prikazani.length === 0 ? (
+        <p style={{ color: T.boja.ink500, fontSize: 14, fontWeight: 600 }}>Nema dokumenata.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {prikazani.map((d) => (
+            <div key={d.id} style={{ background: '#fff', border: `1px solid ${T.boja.edge}`, borderRadius: 14, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.naziv}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.boja.ink500 }}>
+                  {[d.kategorija, formatDatum(d.created_at), formatVel(d.velicina)].filter(Boolean).join(' · ')}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button onClick={() => preuzmi(d)} style={dugme('outline-black', 'sm')}>Preuzmi</button>
+                <button onClick={() => obrisi(d)} style={dugme('outline-danger', 'sm')}>×</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
