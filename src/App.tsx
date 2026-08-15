@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { CalendarCheck, Basketball, Receipt, UsersThree, ChartBar, ChartLineUp, ChatCircleText, FolderSimple, UploadSimple, DotsThreeOutline, SignOut } from '@phosphor-icons/react'
+import { CalendarCheck, Basketball, Receipt, UsersThree, ChartBar, ChartLineUp, ClipboardText, ChatCircleText, FolderSimple, UploadSimple, DotsThreeOutline, SignOut } from '@phosphor-icons/react'
 import { supabase } from './lib/supabase'
 import { T } from './lib/tema'
 import DanasScreen from './features/danas/DanasScreen'
@@ -9,12 +9,13 @@ import ClanarineScreen from './features/clanarine/ClanarineScreen'
 import TreninziScreen from './features/treninzi/TreninziScreen'
 import StatistikaScreen from './features/statistika/StatistikaScreen'
 import FinansijeScreen from './features/finansije/FinansijeScreen'
+import DnevniIzvestajScreen from './features/izvestaj/DnevniIzvestajScreen'
 import ObavestenjaScreen from './features/obavestenja/ObavestenjaScreen'
 import DokumentiScreen from './features/dokumenti/DokumentiScreen'
 import UvozScreen from './features/uvoz/UvozScreen'
 import LoginScreen from './features/auth/LoginScreen'
 
-type Tab = 'danas' | 'treninzi' | 'clanarine' | 'porodice' | 'statistika' | 'finansije' | 'obavestenja' | 'dokumenti' | 'uvoz'
+type Tab = 'danas' | 'treninzi' | 'clanarine' | 'porodice' | 'statistika' | 'finansije' | 'izvestaj' | 'obavestenja' | 'dokumenti' | 'uvoz'
 
 const STAVKE: { t: Tab; l: string; Ikona: any }[] = [
   { t: 'danas', l: 'Danas', Ikona: CalendarCheck },
@@ -23,6 +24,7 @@ const STAVKE: { t: Tab; l: string; Ikona: any }[] = [
   { t: 'porodice', l: 'Porodice', Ikona: UsersThree },
   { t: 'statistika', l: 'Statistika', Ikona: ChartBar },
   { t: 'finansije', l: 'Finansije', Ikona: ChartLineUp },
+  { t: 'izvestaj', l: 'Izveštaj', Ikona: ClipboardText },
   { t: 'obavestenja', l: 'Obaveštenja', Ikona: ChatCircleText },
   { t: 'dokumenti', l: 'Dokumenti', Ikona: FolderSimple },
   { t: 'uvoz', l: 'Uvoz', Ikona: UploadSimple },
@@ -57,6 +59,7 @@ function App() {
       {tab === 'treninzi' && <TreninziScreen />}
       {tab === 'statistika' && <StatistikaScreen />}
       {tab === 'finansije' && <FinansijeScreen />}
+      {tab === 'izvestaj' && <DnevniIzvestajScreen />}
       {tab === 'obavestenja' && <ObavestenjaScreen />}
       {tab === 'dokumenti' && <DokumentiScreen />}
       {tab === 'uvoz' && <UvozScreen />}
