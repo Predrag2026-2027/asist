@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { CalendarCheck, Basketball, Receipt, UsersThree, ChartBar, ChartLineUp, ClipboardText, ChatCircleText, FolderSimple, UploadSimple, DotsThreeOutline, SignOut } from '@phosphor-icons/react'
+import { CalendarCheck, Basketball, Receipt, UsersThree, ChartBar, ChartLineUp, ClipboardText, ChatCircleText, FolderSimple, UploadSimple, GearSix, DotsThreeOutline, SignOut } from '@phosphor-icons/react'
 import { supabase } from './lib/supabase'
 import { T } from './lib/tema'
 import DanasScreen from './features/danas/DanasScreen'
@@ -13,9 +13,10 @@ import DnevniIzvestajScreen from './features/izvestaj/DnevniIzvestajScreen'
 import ObavestenjaScreen from './features/obavestenja/ObavestenjaScreen'
 import DokumentiScreen from './features/dokumenti/DokumentiScreen'
 import UvozScreen from './features/uvoz/UvozScreen'
+import PodesavanjaScreen from './features/podesavanja/PodesavanjaScreen'
 import LoginScreen from './features/auth/LoginScreen'
 
-type Tab = 'danas' | 'treninzi' | 'clanarine' | 'porodice' | 'statistika' | 'finansije' | 'izvestaj' | 'obavestenja' | 'dokumenti' | 'uvoz'
+type Tab = 'danas' | 'treninzi' | 'clanarine' | 'porodice' | 'statistika' | 'finansije' | 'izvestaj' | 'obavestenja' | 'dokumenti' | 'uvoz' | 'podesavanja'
 
 const STAVKE: { t: Tab; l: string; Ikona: any }[] = [
   { t: 'danas', l: 'Danas', Ikona: CalendarCheck },
@@ -28,6 +29,7 @@ const STAVKE: { t: Tab; l: string; Ikona: any }[] = [
   { t: 'obavestenja', l: 'Obaveštenja', Ikona: ChatCircleText },
   { t: 'dokumenti', l: 'Dokumenti', Ikona: FolderSimple },
   { t: 'uvoz', l: 'Uvoz', Ikona: UploadSimple },
+  { t: 'podesavanja', l: 'Podešavanja', Ikona: GearSix },
 ]
 const GLAVNE_MOBILNE: Tab[] = ['danas', 'treninzi', 'clanarine', 'porodice']
 
@@ -63,6 +65,7 @@ function App() {
       {tab === 'obavestenja' && <ObavestenjaScreen />}
       {tab === 'dokumenti' && <DokumentiScreen />}
       {tab === 'uvoz' && <UvozScreen />}
+      {tab === 'podesavanja' && <PodesavanjaScreen />}
     </>
   )
 
@@ -100,7 +103,7 @@ function App() {
 
         {vise && (
           <div onClick={() => setVise(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,.4)', zIndex: 60, display: 'flex', alignItems: 'flex-end' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: '22px 22px 0 0', padding: 16, maxHeight: '70vh', overflowY: 'auto' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: '22px 22px 0 0', padding: 16, maxHeight: '72vh', overflowY: 'auto' }}>
               <div style={{ width: 40, height: 4, borderRadius: 99, background: T.boja.edge, margin: '0 auto 14px' }} />
               {STAVKE.filter((s) => !GLAVNE_MOBILNE.includes(s.t)).map((s) => (
                 <button key={s.t} onClick={() => idi(s.t)} style={{ width: '100%', border: 'none', background: tab === s.t ? T.boja.fill : 'none', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', color: tab === s.t ? T.boja.brand : T.boja.ink, fontSize: 15, fontWeight: 700 }}>
@@ -119,7 +122,7 @@ function App() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: T.boja.bg }}>
-      <aside style={{ width: 244, flex: '0 0 244px', background: T.boja.ink, position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column', padding: '20px 14px' }}>
+      <aside style={{ width: 244, flex: '0 0 244px', background: T.boja.ink, position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column', padding: '20px 14px', overflowY: 'auto' }}>
         <div style={{ padding: '0 6px 20px' }}>{marka}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
           {STAVKE.map((s) => {

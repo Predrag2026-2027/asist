@@ -72,7 +72,7 @@ export default function ClanarineScreen() {
     setCenovnik((cen as any) ?? null)
     const { data: np } = await supabase.from('naplatni_period').select('meseci').eq('sezona_id', sid).is('grupa_id', null).maybeSingle()
     if ((np as any)?.meseci?.length) setMeseci((np as any).meseci)
-    const { data: tr } = await supabase.from('treneri').select('id, ime').order('ime')
+    const { data: tr } = await supabase.from('treneri').select('id, ime').eq('aktivan', true).order('ime')
     setTreneri((tr as any) ?? [])
     const { data: por } = await supabase.from('porodice').select('id, prezime, clanovi(id, ime, datum_rodjenja)').order('prezime')
     setPorodice((por as any) ?? [])

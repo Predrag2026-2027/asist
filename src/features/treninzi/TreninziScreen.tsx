@@ -92,7 +92,7 @@ export default function TreninziScreen() {
     if (!sid) return
     const { data: g } = await supabase.from('grupe').select('id, naziv, tip, uzrast_oznaka').eq('sezona_id', sid).order('tip').order('naziv')
     setGrupe((g as any) ?? [])
-    const { data: t } = await supabase.from('treneri').select('id, ime').order('ime')
+    const { data: t } = await supabase.from('treneri').select('id, ime').eq('aktivan', true).order('ime')
     setTreneri((t as any) ?? [])
     await ucitajRaspored(sid)
   }
