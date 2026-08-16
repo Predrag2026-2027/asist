@@ -33,12 +33,39 @@ const STAVKE: { t: Tab; l: string; Ikona: any }[] = [
 ]
 const GLAVNE_MOBILNE: Tab[] = ['danas', 'treninzi', 'clanarine', 'porodice']
 
+const ANIM_CSS = `
+@keyframes bbArc {
+  0%   { transform: translate(-160px, 96px) rotate(0deg) scale(0.7); opacity: 0; }
+  12%  { opacity: 1; }
+  50%  { transform: translate(-8px, -122px) rotate(380deg) scale(1); opacity: 1; }
+  70%  { transform: translate(0px, -4px) rotate(520deg) scale(1); }
+  82%  { transform: translate(0px, 46px) rotate(610deg) scale(0.92); }
+  100% { transform: translate(0px, 122px) rotate(720deg) scale(0.8); opacity: 0; }
+}
+@keyframes bbNet {
+  0%,60% { transform: scaleY(1); }
+  72%    { transform: scaleY(1.32); }
+  82%    { transform: scaleY(0.9); }
+  92%    { transform: scaleY(1.06); }
+  100%   { transform: scaleY(1); }
+}
+@keyframes bbGlow {
+  0% { opacity: 0; } 22% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; }
+}
+.bbBall { animation: bbArc 0.95s cubic-bezier(0.45,0.05,0.35,1) forwards; }
+.bbNet  { transform-box: fill-box; transform-origin: 50% 0%; animation: bbNet 0.95s ease-in-out forwards; }
+.bbGlow { animation: bbGlow 0.95s ease forwards; }
+@media (prefers-reduced-motion: reduce) { .bbBall, .bbNet, .bbGlow { animation: none !important; opacity: 0 !important; } }
+`
+
 function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [ucitava, setUcitava] = useState(true)
   const [tab, setTab] = useState<Tab>('danas')
   const [vise, setVise] = useState(false)
   const [mobilni, setMobilni] = useState(typeof window !== 'undefined' ? window.innerWidth < 900 : false)
+  const [animKey, setAnimKey] = useState(0)
+  const [showAnim, setShowAnim] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setUcitava(false) })
@@ -48,10 +75,20 @@ function App() {
     return () => { sub.subscription.unsubscribe(); window.removeEventListener('resize', rf) }
   }, [])
 
+  useEffect(() => {
+    if (!showAnim) return
+    const id = setTimeout(() => setShowAnim(false), 1000)
+    return () => clearTimeout(id)
+  }, [showAnim, animKey])
+
   if (ucitava) return <div style={{ padding: 24, color: T.boja.ink500 }}>Učitavam...</div>
   if (!session) return <LoginScreen />
 
-  function idi(t: Tab) { setTab(t); setVise(false) }
+  function idi(t: Tab) {
+    if (t !== tab) { setAnimKey((k) => k + 1); setShowAnim(true) }
+    setTab(t)
+    setVise(false)
+  }
 
   const ekran = (
     <>
@@ -69,6 +106,39 @@ function App() {
     </>
   )
 
+  const prelaz = showAnim ? (
+    <div key={animKey} style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none', display: 'grid', placeItems: 'center' }}>
+      <div style={{ position: 'relative', width: 360, height: 240 }}>
+        <div className="bbGlow" style={{ position: 'absolute', left: 100, top: 30, width: 170, height: 170, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,110,0,0.30), transparent 70%)' }} />
+        <svg viewBox="0 0 360 240" width="360" height="240" style={{ position: 'absolute', inset: 0 }}>
+          <rect x="120" y="44" width="120" height="62" rx="6" fill="#ffffff" stroke="#d3d8e4" strokeWidth="3" />
+          <rect x="162" y="72" width="36" height="26" rx="3" fill="none" stroke="#ff4d00" strokeWidth="3" />
+          <g className="bbNet" stroke="rgba(90,95,110,0.55)" strokeWidth="2" fill="none">
+            <path d="M132 122 L160 196" />
+            <path d="M146 126 L166 196" />
+            <path d="M163 128 L172 196" />
+            <path d="M180 128 L180 196" />
+            <path d="M197 128 L188 196" />
+            <path d="M214 126 L194 196" />
+            <path d="M228 122 L200 196" />
+            <path d="M150 150 Q180 160 210 150" />
+            <path d="M156 174 Q180 182 204 174" />
+          </g>
+          <ellipse cx="180" cy="120" rx="52" ry="13" fill="none" stroke="#ff4d00" strokeWidth="6" />
+        </svg>
+        <div className="bbBall" style={{ position: 'absolute', left: 160, top: 104, width: 40, height: 40 }}>
+          <svg viewBox="0 0 100 100" width="40" height="40">
+            <circle cx="50" cy="50" r="46" fill="#ff6a00" stroke="#2f1206" strokeWidth="4" />
+            <line x1="50" y1="6" x2="50" y2="94" stroke="#2f1206" strokeWidth="4" />
+            <line x1="6" y1="50" x2="94" y2="50" stroke="#2f1206" strokeWidth="4" />
+            <path d="M50 6 C22 30 22 70 50 94" fill="none" stroke="#2f1206" strokeWidth="4" />
+            <path d="M50 6 C78 30 78 70 50 94" fill="none" stroke="#2f1206" strokeWidth="4" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  ) : null
+
   const marka = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div style={{ width: 40, height: 40, borderRadius: T.r.brand, background: T.boja.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 18px rgba(255,77,0,0.4)' }}>
@@ -84,7 +154,7 @@ function App() {
   if (mobilni) {
     return (
       <div style={{ minHeight: '100vh', background: 'transparent' }}>
-        <main style={{ paddingBottom: 78 }}>{ekran}</main>
+        <main style={{ paddingBottom: 78 }}>{prelaz}{ekran}</main>
         <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'linear-gradient(180deg, #151d2e 0%, #0e1421 100%)', display: 'flex', borderTop: `1px solid ${T.boja.ink800}`, zIndex: 50, boxShadow: '0 -6px 20px rgba(17,24,39,0.16)' }}>
           {STAVKE.filter((s) => GLAVNE_MOBILNE.includes(s.t)).map((s) => {
             const a = tab === s.t
@@ -116,6 +186,7 @@ function App() {
             </div>
           </div>
         )}
+        <style>{ANIM_CSS}</style>
       </div>
     )
   }
@@ -138,7 +209,8 @@ function App() {
           <SignOut size={20} /> Odjava
         </button>
       </aside>
-      <main style={{ flex: 1, minHeight: '100vh' }}>{ekran}</main>
+      <main style={{ flex: 1, minHeight: '100vh' }}>{prelaz}{ekran}</main>
+      <style>{ANIM_CSS}</style>
     </div>
   )
 }
