@@ -12,27 +12,53 @@ body {
   min-width: 320px;
   min-height: 100vh;
   color: #111827;
-  background-color: #f4f5f9;
-  background-image:
-    radial-gradient(1100px 560px at 100% -8%, rgba(255, 77, 0, 0.10), transparent 60%),
-    radial-gradient(900px 480px at -8% 8%, rgba(119, 85, 255, 0.08), transparent 55%),
-    radial-gradient(700px 700px at 50% 120%, rgba(13, 172, 55, 0.05), transparent 60%),
-    linear-gradient(180deg, #fbfbfe 0%, #f2f3f8 100%);
-  background-attachment: fixed;
+  background-color: #eef0f6;
+}
+
+/* Živa pozadina: obojene mrlje koje polako plutaju */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(620px 620px at 14% 18%, rgba(255, 77, 0, 0.18), transparent 60%),
+    radial-gradient(620px 620px at 86% 12%, rgba(119, 85, 255, 0.16), transparent 60%),
+    radial-gradient(760px 760px at 72% 92%, rgba(13, 172, 55, 0.10), transparent 62%),
+    linear-gradient(180deg, #fbfbfe 0%, #eceef6 100%);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+@keyframes drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-3%, 2%, 0) scale(1.06); }
+  100% { transform: translate3d(3%, -2%, 0) scale(1.1); }
 }
 
 /* Ulazak ekrana */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(14px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-main > div { animation: fadeInUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+main > div { animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-/* Dugmad: mekani prelazi + suptilno podizanje */
+/* Bele kartice (radijus 14/16) "lebde" nad pozadinom + podižu se na hover */
+main div[style*="border-radius: 16px"],
+main div[style*="border-radius: 14px"] {
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05), 0 12px 28px -14px rgba(17, 24, 39, 0.18);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+}
+main div[style*="border-radius: 16px"]:hover,
+main div[style*="border-radius: 14px"]:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(17, 24, 39, 0.07), 0 22px 46px -16px rgba(255, 77, 0, 0.28);
+}
+
+/* Dugmad */
 button {
   transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.12s ease, background 0.15s ease;
 }
-button:hover { filter: brightness(1.04); }
+button:hover { filter: brightness(1.05); }
 button:active { transform: translateY(1px) scale(0.99); }
 
 /* Polja: fokus-prsten u brend boji */
@@ -42,16 +68,21 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: #ff8e42 !important;
-  box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.16);
+  box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.18);
 }
 
-/* Lepši scrollbar */
-* { scrollbar-width: thin; scrollbar-color: #d3d7e0 transparent; }
+/* Scrollbar */
+* { scrollbar-width: thin; scrollbar-color: #cfd3de transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb {
-  background: #d3d7e0;
+  background: #cfd3de;
   border-radius: 99px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: #b7bcc9; }
+*::-webkit-scrollbar-thumb:hover { background: #b3b8c6; }
+
+/* Poštuj korisnike koji smanjuju animacije */
+@media (prefers-reduced-motion: reduce) {
+  *, body::before { animation: none !important; transition: none !important; }
+}
