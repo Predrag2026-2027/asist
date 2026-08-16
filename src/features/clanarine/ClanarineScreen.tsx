@@ -63,8 +63,8 @@ export default function ClanarineScreen() {
     if (!sid) return
     const pg = (sez as any).datum_od ? new Date((sez as any).datum_od).getFullYear() : new Date().getFullYear()
     setPocetnaGodina(pg)
-    const { data: cen } = await supabase.from('cenovnik').select('iznos_1_dete, iznos_2_dete, iznos_3plus').eq('sezona_id', sid).order('vazi_od', { ascending: false }).limit(1).maybeSingle()
-    setCenovnik((cen as any) ?? null)
+    const { data: cen } = await supabase.from('cenovnik').select('id, iznos_1_dete, iznos_2_dete, iznos_3plus, vazi_od, vazi_do').eq('sezona_id', sid).order('vazi_od')
+    setCene((cen as any) ?? [])
     const { data: np } = await supabase.from('naplatni_period').select('meseci').eq('sezona_id', sid).is('grupa_id', null).maybeSingle()
     if ((np as any)?.meseci?.length) setMeseci((np as any).meseci)
     const { data: tr } = await supabase.from('treneri').select('id, ime').eq('aktivan', true).order('ime')
