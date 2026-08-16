@@ -3,8 +3,55 @@
 :root {
   font-family: 'Manrope', system-ui, sans-serif;
   color: #111827;
-  background-color: #f9fafb;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; color: #111827; background-color: #f9fafb; }
+html, body { margin: 0; padding: 0; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  color: #111827;
+  background-color: #f4f5f9;
+  background-image:
+    radial-gradient(1100px 560px at 100% -8%, rgba(255, 77, 0, 0.10), transparent 60%),
+    radial-gradient(900px 480px at -8% 8%, rgba(119, 85, 255, 0.08), transparent 55%),
+    radial-gradient(700px 700px at 50% 120%, rgba(13, 172, 55, 0.05), transparent 60%),
+    linear-gradient(180deg, #fbfbfe 0%, #f2f3f8 100%);
+  background-attachment: fixed;
+}
+
+/* Ulazak ekrana */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+main > div { animation: fadeInUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Dugmad: mekani prelazi + suptilno podizanje */
+button {
+  transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.12s ease, background 0.15s ease;
+}
+button:hover { filter: brightness(1.04); }
+button:active { transform: translateY(1px) scale(0.99); }
+
+/* Polja: fokus-prsten u brend boji */
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #ff8e42 !important;
+  box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.16);
+}
+
+/* Lepši scrollbar */
+* { scrollbar-width: thin; scrollbar-color: #d3d7e0 transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: #d3d7e0;
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: #b7bcc9; }

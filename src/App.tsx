@@ -71,7 +71,7 @@ function App() {
 
   const marka = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 40, height: 40, borderRadius: T.r.brand, background: T.boja.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 40, height: 40, borderRadius: T.r.brand, background: T.boja.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 18px rgba(255,77,0,0.4)' }}>
         <span style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.06em' }}>BB</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -83,9 +83,9 @@ function App() {
 
   if (mobilni) {
     return (
-      <div style={{ minHeight: '100vh', background: T.boja.bg }}>
+      <div style={{ minHeight: '100vh', background: 'transparent' }}>
         <main style={{ paddingBottom: 78 }}>{ekran}</main>
-        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: T.boja.ink, display: 'flex', borderTop: `1px solid ${T.boja.ink800}`, zIndex: 50 }}>
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'linear-gradient(180deg, #151d2e 0%, #0e1421 100%)', display: 'flex', borderTop: `1px solid ${T.boja.ink800}`, zIndex: 50, boxShadow: '0 -6px 20px rgba(17,24,39,0.16)' }}>
           {STAVKE.filter((s) => GLAVNE_MOBILNE.includes(s.t)).map((s) => {
             const a = tab === s.t
             return (
@@ -121,8 +121,8 @@ function App() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: T.boja.bg }}>
-      <aside style={{ width: 244, flex: '0 0 244px', background: T.boja.ink, position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column', padding: '20px 14px', overflowY: 'auto' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'transparent' }}>
+      <aside style={{ width: 244, flex: '0 0 244px', background: 'linear-gradient(180deg, #151d2e 0%, #0e1421 100%)', position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column', padding: '20px 14px', overflowY: 'auto', boxShadow: '2px 0 18px rgba(17,24,39,0.12)' }}>
         <div style={{ padding: '0 6px 20px' }}>{marka}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
           {STAVKE.map((s) => {
