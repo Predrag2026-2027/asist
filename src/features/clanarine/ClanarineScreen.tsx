@@ -2,8 +2,8 @@
 import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
 import { T, dugme, polje, labela } from '../../lib/tema'
+import { cenovnikZaPeriod, iznosZa, type CenRed } from '../../lib/cenovnik'
 
-type Cenovnik = { iznos_1_dete: number; iznos_2_dete: number; iznos_3plus: number }
 type Porodica = { id: string; prezime: string; clanovi: { id: string; ime: string; datum_rodjenja: string | null }[] }
 type ZaduzenjeInfo = { id: string; iznos_ukupno: number; uplaceno: number }
 type IstorijaZapis = { period: string; iznos_ukupno: number; uplate: { iznos: number; datum: string; nacin: string | null }[] }
@@ -31,7 +31,7 @@ export default function ClanarineScreen() {
   const [pocetnaGodina, setPocetnaGodina] = useState<number>(new Date().getFullYear())
   const [meseci, setMeseci] = useState<number[]>([9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7])
   const [izabraniMesec, setIzabraniMesec] = useState<number>(9)
-  const [cenovnik, setCenovnik] = useState<Cenovnik | null>(null)
+  const [cene, setCene] = useState<CenRed[]>([])
   const [porodice, setPorodice] = useState<Porodica[]>([])
   const [brojDece, setBrojDece] = useState<Record<string, number>>({})
   const [zaduzenja, setZaduzenja] = useState<Record<string, ZaduzenjeInfo>>({})
@@ -53,12 +53,7 @@ export default function ClanarineScreen() {
     return `${godina}-${String(mesec).padStart(2, '0')}-01`
   }
   function iznosZaBroj(n: number): number {
-    if (!cenovnik || n <= 0) return 0
-    let s = 0
-    if (n >= 1) s += Number(cenovnik.iznos_1_dete)
-    if (n >= 2) s += Number(cenovnik.iznos_2_dete)
-    if (n >= 3) s += Number(cenovnik.iznos_3plus) * (n - 2)
-    return s
+    return iznosZa(cenovnikZaPeriod(cene, periodString(izabraniMesec)), n)
   }
 
   async function ucitajOsnovu() {

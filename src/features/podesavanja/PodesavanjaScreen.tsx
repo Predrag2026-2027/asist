@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { T, dugme, polje, labela } from '../../lib/tema'
+import { type CenRed } from '../../lib/cenovnik'
 
 type Trener = { id: string; ime: string; telefon: string | null; aktivan: boolean; uloga: string | null }
 
@@ -14,19 +15,35 @@ const ULOGE = ['trener', 'pomoćni trener', 'administrator']
 const karta: React.CSSProperties = { background: '#fff', border: `1px solid ${T.boja.edge}`, borderRadius: 16, padding: 16, marginBottom: 14 }
 const pilula = (bg: string, fg: string): React.CSSProperties => ({ fontSize: 11, fontWeight: 800, padding: '4px 11px', borderRadius: 99, background: bg, color: fg, display: 'inline-block' })
 
+function formatDMY(d: string | null): string { if (!d) return ''; const [g, m, dan] = d.split('-'); return `${dan}.${m}.${g}.` }
+function danPre(d: string): string {
+  const dt = new Date(d + 'T00:00:00')
+  dt.setDate(dt.getDate() - 1)
+  return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
+function formatRSD(n: number): string { return new Intl.NumberFormat('sr-RS').format(n) + ' RSD' }
+
 export default function PodesavanjaScreen() {
   const [sezonaId, setSezonaId] = useState<string | null>(null)
-  const [cenovnikId, setCenovnikId] = useState<string | null>(null)
   const [datumOd, setDatumOd] = useState('')
   const [datumDo, setDatumDo] = useState('')
-  const [c1, setC1] = useState('')
-  const [c2, setC2] = useState('')
-  const [c3, setC3] = useState('')
+  const [cene, setCene] = useState<CenRed[]>([])
   const [npId, setNpId] = useState<string | null>(null)
   const [meseci, setMeseci] = useState<number[]>([])
   const [treneri, setTreneri] = useState<Trener[]>([])
   const [poruka, setPoruka] = useState<{ tip: 'greska' | 'uspeh'; tekst: string; gde: string } | null>(null)
   const [radi, setRadi] = useState(false)
+
+  const [nvOd, setNvOd] = useState('')
+  const [nc1, setNc1] = useState('')
+  const [nc2, setNc2] = useState('')
+  const [nc3, setNc3] = useState('')
+  const [editCenaId, setEditCenaId] = useState<string | null>(null)
+  const [ec1, setEc1] = useState('')
+  const [ec2, setEc2] = useState('')
+  const [ec3, setEc3] = useState('')
+  const [eOd, setEOd] = useState('')
+  const [eDo, setEDo] = useState('')
 
   const [novoIme, setNovoIme] = useState('')
   const [noviTel, setNoviTel] = useState('')
@@ -43,42 +60,67 @@ export default function PodesavanjaScreen() {
     setSezonaId(s.id)
     setDatumOd(s.datum_od ?? '')
     setDatumDo(s.datum_do ?? '')
-
-    const { data: cen } = await supabase.from('cenovnik').select('id, iznos_1_dete, iznos_2_dete, iznos_3plus').eq('sezona_id', s.id).order('vazi_od', { ascending: false }).limit(1).maybeSingle()
-    if (cen) {
-      const c = cen as any
-      setCenovnikId(c.id)
-      setC1(String(Number(c.iznos_1_dete)))
-      setC2(String(Number(c.iznos_2_dete)))
-      setC3(String(Number(c.iznos_3plus)))
-    }
-
+    setNvOd(s.datum_od ?? '')
+    await ucitajCene(s.id)
     const { data: np } = await supabase.from('naplatni_period').select('id, meseci').eq('sezona_id', s.id).is('grupa_id', null).maybeSingle()
     if (np) { setNpId((np as any).id); setMeseci(((np as any).meseci as number[]) ?? []) }
     else setMeseci([9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7])
-
     const { data: tr } = await supabase.from('treneri').select('id, ime, telefon, aktivan, uloga').order('ime')
     setTreneri((tr as any) ?? [])
   }
 
+  async function ucitajCene(sid: string) {
+    const { data } = await supabase.from('cenovnik').select('id, iznos_1_dete, iznos_2_dete, iznos_3plus, vazi_od, vazi_do').eq('sezona_id', sid).order('vazi_od')
+    setCene((data as any) ?? [])
+  }
+
   useEffect(() => { ucitaj() }, [])
 
-  async function sacuvajCenovnik() {
+  async function dodajCenu() {
     setPoruka(null)
-    const n1 = Number(c1.replace(',', '.')), n2 = Number(c2.replace(',', '.')), n3 = Number(c3.replace(',', '.'))
+    const n1 = Number(nc1.replace(',', '.')), n2 = Number(nc2.replace(',', '.')), n3 = Number(nc3.replace(',', '.'))
+    if (!nvOd) { setPoruka({ tip: 'greska', tekst: 'Unesi datum od kog cena važi.', gde: 'cena' }); return }
     if ([n1, n2, n3].some((x) => isNaN(x) || x < 0)) { setPoruka({ tip: 'greska', tekst: 'Unesi ispravne iznose.', gde: 'cena' }); return }
     setRadi(true)
     try {
-      if (cenovnikId) {
-        const { error } = await supabase.from('cenovnik').update({ iznos_1_dete: n1, iznos_2_dete: n2, iznos_3plus: n3 }).eq('id', cenovnikId)
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase.from('cenovnik').insert({ sezona_id: sezonaId, iznos_1_dete: n1, iznos_2_dete: n2, iznos_3plus: n3, valuta: 'RSD', vazi_od: datumOd || null }).select('id').single()
-        if (error) throw error
-        setCenovnikId((data as any).id)
+      const otvorena = cene.filter((c) => !c.vazi_do && (c.vazi_od ?? '') < nvOd).sort((a, b) => (b.vazi_od ?? '').localeCompare(a.vazi_od ?? ''))[0]
+      if (otvorena) {
+        const { error: eZ } = await supabase.from('cenovnik').update({ vazi_do: danPre(nvOd) }).eq('id', otvorena.id)
+        if (eZ) throw eZ
       }
-      setPoruka({ tip: 'uspeh', tekst: 'Cenovnik je sačuvan. Važi za nova zaduženja; već obračunati meseci ostaju nepromenjeni.', gde: 'cena' })
+      const { error } = await supabase.from('cenovnik').insert({ sezona_id: sezonaId, iznos_1_dete: n1, iznos_2_dete: n2, iznos_3plus: n3, valuta: 'RSD', vazi_od: nvOd, vazi_do: null })
+      if (error) throw error
+      setNc1(''); setNc2(''); setNc3('')
+      setPoruka({ tip: 'uspeh', tekst: `Nova cena važi od ${formatDMY(nvOd)} Prethodna je zatvorena danom ranije.`, gde: 'cena' })
+      if (sezonaId) await ucitajCene(sezonaId)
     } catch (err: any) { setPoruka({ tip: 'greska', tekst: 'Greška: ' + (err.message ?? String(err)), gde: 'cena' }) } finally { setRadi(false) }
+  }
+
+  function pocniIzmenuCene(c: CenRed) {
+    setEditCenaId(c.id)
+    setEc1(String(Number(c.iznos_1_dete)))
+    setEc2(String(Number(c.iznos_2_dete)))
+    setEc3(String(Number(c.iznos_3plus)))
+    setEOd(c.vazi_od ?? '')
+    setEDo(c.vazi_do ?? '')
+    setPoruka(null)
+  }
+
+  async function sacuvajCenu(id: string) {
+    const n1 = Number(ec1.replace(',', '.')), n2 = Number(ec2.replace(',', '.')), n3 = Number(ec3.replace(',', '.'))
+    if ([n1, n2, n3].some((x) => isNaN(x) || x < 0)) { setPoruka({ tip: 'greska', tekst: 'Unesi ispravne iznose.', gde: 'cena' }); return }
+    const { error } = await supabase.from('cenovnik').update({ iznos_1_dete: n1, iznos_2_dete: n2, iznos_3plus: n3, vazi_od: eOd || null, vazi_do: eDo || null }).eq('id', id)
+    if (error) { setPoruka({ tip: 'greska', tekst: 'Greška: ' + error.message, gde: 'cena' }); return }
+    setEditCenaId(null)
+    if (sezonaId) await ucitajCene(sezonaId)
+    setPoruka({ tip: 'uspeh', tekst: 'Cena je izmenjena.', gde: 'cena' })
+  }
+
+  async function obrisiCenu(id: string) {
+    if (!window.confirm('Obrisati ovu cenu?')) return
+    const { error } = await supabase.from('cenovnik').delete().eq('id', id)
+    if (error) { setPoruka({ tip: 'greska', tekst: 'Greška: ' + error.message, gde: 'cena' }); return }
+    if (sezonaId) await ucitajCene(sezonaId)
   }
 
   async function sacuvajSezonu() {
@@ -150,23 +192,66 @@ export default function PodesavanjaScreen() {
       </div>
 
       <div style={karta}>
-        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Cena članarine (mesečno)</div>
-        <p style={{ fontSize: 12, fontWeight: 600, color: T.boja.ink500, marginTop: 0 }}>Iznos po detetu; treće i svako naredno dete = 0 ako tako želiš.</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-          <div style={{ flex: 1, minWidth: 100 }}>
-            <label style={labela}>1. dete</label>
-            <input style={polje} value={c1} onChange={(e) => setC1(e.target.value)} inputMode="numeric" />
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Cena članarine (po periodima)</div>
+        <p style={{ fontSize: 12, fontWeight: 600, color: T.boja.ink500, marginTop: 0 }}>Svaka cena važi od zadatog datuma. Obračun za neki mesec povlači cenu koja je važila u tom mesecu; već obračunata zaduženja ostaju nepromenjena.</p>
+
+        {cene.length === 0 ? (
+          <p style={{ fontSize: 13, fontWeight: 600, color: T.boja.ink500 }}>Još nema definisanih cena. Dodaj prvu ispod.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+            {cene.map((c) => (
+              <div key={c.id} style={{ border: `1px solid ${T.boja.edge}`, borderRadius: 12, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, fontSize: 14 }}>od {formatDMY(c.vazi_od)}</span>
+                      {c.vazi_do ? <span style={pilula(T.boja.fill, T.boja.ink600)}>do {formatDMY(c.vazi_do)}</span> : <span style={pilula(T.boja.greenBg, T.boja.green700)}>trenutna</span>}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.boja.ink500, marginTop: 2 }}>
+                      1: {formatRSD(Number(c.iznos_1_dete))} · 2: {formatRSD(Number(c.iznos_2_dete))} · 3+: {formatRSD(Number(c.iznos_3plus))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => pocniIzmenuCene(c)} style={dugme('outline-black', 'sm')}>Izmeni</button>
+                    <button onClick={() => obrisiCenu(c.id)} style={dugme('outline-danger', 'sm')}>×</button>
+                  </div>
+                </div>
+
+                {editCenaId === c.id && (
+                  <div style={{ marginTop: 10, borderTop: `1px solid ${T.boja.edge}`, paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 80 }}><label style={labela}>1. dete</label><input style={polje} value={ec1} onChange={(e) => setEc1(e.target.value)} inputMode="numeric" /></div>
+                      <div style={{ flex: 1, minWidth: 80 }}><label style={labela}>2. dete</label><input style={polje} value={ec2} onChange={(e) => setEc2(e.target.value)} inputMode="numeric" /></div>
+                      <div style={{ flex: 1, minWidth: 80 }}><label style={labela}>3.+ dete</label><input style={polje} value={ec3} onChange={(e) => setEc3(e.target.value)} inputMode="numeric" /></div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 130 }}><label style={labela}>Važi od</label><input type="date" style={polje} value={eOd} onChange={(e) => setEOd(e.target.value)} /></div>
+                      <div style={{ flex: 1, minWidth: 130 }}><label style={labela}>Važi do (prazno = trenutna)</label><input type="date" style={polje} value={eDo} onChange={(e) => setEDo(e.target.value)} /></div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => sacuvajCenu(c.id)} style={{ ...dugme('brand', 'md'), flex: 1 }}>Sačuvaj</button>
+                      <button onClick={() => setEditCenaId(null)} style={dugme('ghost-black', 'md')}>Otkaži</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-          <div style={{ flex: 1, minWidth: 100 }}>
-            <label style={labela}>2. dete</label>
-            <input style={polje} value={c2} onChange={(e) => setC2(e.target.value)} inputMode="numeric" />
+        )}
+
+        <div style={{ border: `1px solid ${T.boja.edge}`, borderRadius: 12, padding: 12, background: T.boja.bg }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Nova cena</div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={labela}>Važi od</label>
+            <input type="date" style={polje} value={nvOd} onChange={(e) => setNvOd(e.target.value)} />
           </div>
-          <div style={{ flex: 1, minWidth: 100 }}>
-            <label style={labela}>3.+ dete</label>
-            <input style={polje} value={c3} onChange={(e) => setC3(e.target.value)} inputMode="numeric" />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            <div style={{ flex: 1, minWidth: 80 }}><label style={labela}>1. dete</label><input style={polje} value={nc1} onChange={(e) => setNc1(e.target.value)} inputMode="numeric" /></div>
+            <div style={{ flex: 1, minWidth: 80 }}><label style={labela}>2. dete</label><input style={polje} value={nc2} onChange={(e) => setNc2(e.target.value)} inputMode="numeric" /></div>
+            <div style={{ flex: 1, minWidth: 80 }}><label style={labela}>3.+ dete</label><input style={polje} value={nc3} onChange={(e) => setNc3(e.target.value)} inputMode="numeric" /></div>
           </div>
+          <button onClick={dodajCenu} disabled={radi} style={dugme('brand', 'md')}>+ Dodaj cenu</button>
         </div>
-        <button onClick={sacuvajCenovnik} disabled={radi} style={dugme('brand', 'md')}>Sačuvaj cenu</button>
         <div style={{ marginTop: 8 }}>{p('cena')}</div>
       </div>
 
